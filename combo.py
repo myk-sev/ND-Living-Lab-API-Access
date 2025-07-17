@@ -1,16 +1,14 @@
 from dotenv import load_dotenv
 import datetime, os, requests
 import pandas as pd
-from hobolinkutils import get_new_token
+from hobolinkutils import get_new_token, time_formatter_hobolink
 
 load_dotenv()
-### Currently Hardcoded #### (generalize this later)
-START_STR = "2025-01-01 00:00:00"
-END_STR = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
 
 #### MANUAL SETTINGS ###
-START = "2025-07-01 00:00:00"
-END = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+# Utilize ISO 8601 Standard YYYY-mm-ddTHH:MM:SS+HH:MM
+START = "2025-01-01T00:00:00+05:00" #The time after the "+" is timezone information
+END = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
 
 ### TELLUS SETTINGS ###
 KEY = os.environ.get("API_KEY")
@@ -29,19 +27,15 @@ HOBOLINK_AUTH_SERVER = "https://webservice.hobolink.com/ws/auth/token"
 HOBOLINK_API = "https://webservice.hobolink.com/ws/data/file/JSON/user"
 
 
-
 ### TIME FORMATS ###
 # HOBOLINK: YYYY-MM-DD HH:mm:SS
 # TELLUS:   YYYY-MM-DDTHH:MM:SS+H:MM
 
 if __name__ == "__main__":
-
-    token = get_new_token(HOBOLINK_AUTH_SERVER, CLIENT_ID, CLIENT_SECRET)
-    # HOBOlink url to get data from file endpoints
     payload = {
         "loggers": LOGGER_SN,
-        "start_date_time": START_STR,
-        "end_date_time": END_STR
+        "start_date_time": time_formatter_hobolink(START),
+        "end_date_time": time_formatter_hobolink(END)
     }
     hobolink_header = {
         'Authorization': 'Bearer ' + get_new_token(HOBOLINK_AUTH_SERVER, CLIENT_ID, CLIENT_SECRET)
