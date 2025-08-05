@@ -16,7 +16,7 @@ def get_new_token(auth_server_url, client_id, client_secret):
         print("Failed to obtain token from the OAuth 2.0 server")
         sys.exit(1)
     else:
-        print("Successful")
+        print("Successful", "\n")
 
     tokens = json.loads(token_response.text)
     return tokens['access_token']
