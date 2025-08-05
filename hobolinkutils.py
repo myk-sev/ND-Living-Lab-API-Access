@@ -1,4 +1,5 @@
 import datetime, requests, sys, json
+
 def get_new_token(auth_server_url, client_id, client_secret):
     """Obtain a new OAuth 2.0 token from the authentication server."""
     token_req_payload = {'grant_type': 'client_credentials'}
@@ -23,5 +24,5 @@ def get_new_token(auth_server_url, client_id, client_secret):
 def time_formatter_hobolink(dt_str):
     """Ensures time entry is compatible with HOBOlink API: YYYY-MM-DD HH:mm:SS"""
     dt_obj = datetime.datetime.fromisoformat(dt_str)
-    hobolink_time = dt_obj.strftime("%Y-%m-%d %H:%M:%S")
+    hobolink_time = dt_obj.strftime("%Y-%m-%d %H:%M:%S") #IS THIS ACCOUNTING FOR TIMEZONE INFO
     return hobolink_time

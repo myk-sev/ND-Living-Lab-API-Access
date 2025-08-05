@@ -31,21 +31,28 @@ HOBOLINK_API = "https://webservice.hobolink.com/ws/data/file/JSON/user"
 # HOBOLINK: YYYY-MM-DD HH:mm:SS
 # TELLUS:   YYYY-MM-DDTHH:MM:SS+H:MM
 
-if __name__ == "__main__":
+def retrieve_data_hobolink(start_time, end_time):
     payload = {
         "loggers": LOGGER_SN,
-        "start_date_time": time_formatter_hobolink(START),
-        "end_date_time": time_formatter_hobolink(END)
+        "start_date_time": time_formatter_hobolink(start_time),
+        "end_date_time": time_formatter_hobolink(end_time)
     }
-    hobolink_header = {
+    header = {
         'Authorization': 'Bearer ' + get_new_token(HOBOLINK_AUTH_SERVER, CLIENT_ID, CLIENT_SECRET)
     }
+    host = f"{HOBOLINK_API}/{USER_ID}"
 
-    hobolink_url = f"{HOBOLINK_API}/{USER_ID}"
-    hobolink_response = requests.get(url=hobolink_url, headers=hobolink_header, params=payload, verify=True)
-    df = pd.DataFrame.from_dict(hobolink_response.json()["observation_list"])
-    df.to_csv("response.csv")
-    print("CVS written")
-    print(df.head())
+    print("Retrieving HoboLink Data...")
+    response = requests.get(url=host, headers=header, params=payload, verify=True)
+    print("Successful", "/n")
+
+    df = pd.DataFrame.from_dict(response.json()["observation_list"])
+    return df
+
+if __name__ == "__main__":
+    hobolinkDF = retrieve_data_hobolink(START, END)
+    #hobolinkDF.to_csv("response.csv")
+    #print("CVS written")
+    print(hobolinkDF.head())
 
 
