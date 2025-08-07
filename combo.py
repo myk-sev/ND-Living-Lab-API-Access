@@ -63,10 +63,15 @@ def retrieve_data_hobolink(start_time, end_time):
 
     print("Retrieving HoboLink Data...")
     response = requests.get(url=host, headers=header, params=payload, verify=True)
-    print("Successful", "\n")
 
-    df = pd.DataFrame.from_dict(response.json()["observation_list"])
-    return df
+    if response.status_code == 200:
+        df = pd.DataFrame.from_dict(response.json()["observation_list"])
+        print("Successful", "\n")
+        return df
+    else:
+        print(f"\t {response.status_code}: {response.json()['error']} {response.json()['error_description']}")
+        print("\t", response.json()['message'])
+        sys.exit(1)
 
 def retrieve_data_tellus(start_time, end_time, devices, metrics):
     header = {'x-api-version': 'v2'}
