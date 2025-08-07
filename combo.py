@@ -15,20 +15,28 @@ END = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ'
 TELLUS_METRICS = ["bme280.pressure", "sunrise.co2","pms5003t.d2_5"]
 
 ### TELLUS SETTINGS ###
-TELLUS_KEY = os.environ.get("API_KEY")
+TELLUS_KEY = os.environ.get("TELLUS_KEY")
 TELLUS_API = 'https://api.tellusensors.com'
-HEADERS = {'x-api-version': 'v2'}
 FYE_1 = os.environ.get("DEVICE_ID_FYE1")
 FYE_2 = os.environ.get("DEVICE_ID_FYE2")
 LUCY_CIL = os.environ.get("DEVICE_ID_CIL")
 
 ### HOBOLINK SETTINGS ###
+HOBOLINK_AUTH_SERVER = "https://webservice.hobolink.com/ws/auth/token"
+HOBOLINK_API = "https://webservice.hobolink.com/ws/data/file/JSON/user"
 LOGGER_SN = os.environ.get("LOGGER_ID")
 USER_ID = os.environ.get("USER_ID")
 CLIENT_ID = os.environ.get("CLIENT_ID")
 CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
-HOBOLINK_AUTH_SERVER = "https://webservice.hobolink.com/ws/auth/token"
-HOBOLINK_API = "https://webservice.hobolink.com/ws/data/file/JSON/user"
+
+
+### LICOR SETTINGS ###
+LICOR_API = "https://api.licor.cloud/v1/data"
+LICOR_KEY = os.environ.get("LICOR_KEY")
+IRISH_ONE = os.environ.get("DEVICE_ID_IRISH_ONE")
+IRISH_TWO = os.environ.get("DEVICE_ID_IRISH_TWO")
+IRISH_THREE = os.environ.get("DEVICE_ID_IRISH_THREE")
+
 
 
 ### TIME FORMATS ###
@@ -60,31 +68,52 @@ def retrieve_data_hobolink(start_time, end_time):
     return df
 
 def retrieve_data_tellus(start_time, end_time):
+    header = {'x-api-version': 'v2'}
+    host = TELLUS_API + "/data"
     payload = {
         "key": TELLUS_KEY,
-        "deviceId": f"{FYE_1},{FYE_2},{LUCY_CIL}",
+        "deviceId": ','.join([FYE_1, FYE_2, LUCY_CIL]),
         'start': start_time,
         'end': end_time,
         'metric': ",".join(TELLUS_METRICS)
     }
-    header = {'x-api-version': 'v2'}
-    host = TELLUS_API + "/data"
 
     print("Retrieving TELLUS Data...")
     response = requests.get(url=host, headers=header, params=payload)
 
     if response.status_code == 200:
-        print("Success")
-
+        df = pd.DataFrame(response.json())
+        print("Success", "\n")
+        return df
     elif response.status_code == 413:
         print("\t", "Requested data set too large. Please modify dates.")
         sys.exit(1)
-
     else:
-        print("\t", "New Code")
+        print(f"\t {response.status_code}: {response.json()['detail']}")
+        sys.exit(1)
 
-    df = pd.DataFrame(response.json())
-    return df
+
+def retrieve_data_licor(start_time, end_time, devices):
+    header = {
+        "Authorization": f"Bearer {LICOR_KEY}"
+    }
+    payload = {
+        "loggers": ','.join(devices),
+        "start_date_time": start_time,
+        "end_date_time": end_time
+    }
+    print("Retrieving LICOR Data...")
+    response = requests.get(url=LICOR_API, params=payload, headers=header)
+
+    if response.status_code == 200:
+        df = pd.DataFrame(response.json()["data"])
+        print("Success", "\n")
+        return df
+    else:
+        print(f"\t {response.status_code}: {response.json()['error']} {response.json()['error_description']}" )
+        print("\t", response.json()['message'])
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     hobolinkDF = retrieve_data_hobolink(START, END)
@@ -93,6 +122,10 @@ if __name__ == "__main__":
     #print(hobolinkDF.head())
 
     tellusDF = retrieve_data_tellus(START, END)
+    
+    licor_devices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
+    licorDF = retrieve_data_licor(time_formatter_hobolink(START), time_formatter_hobolink(END), licor_devices)
+    print(licorDF)
 
 
 
