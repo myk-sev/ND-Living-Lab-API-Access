@@ -9,8 +9,8 @@ load_dotenv()
 
 #### MANUAL SETTINGS ###
 # Utilize ISO 8601 Standard YYYY-mm-ddTHH:MM:SS+HH:MM
-#START = "2025-01-01T00:00:00+05:00" #The time after the "+" is timezone information
-START = "2025-08-05T00:00:00+05:00" #The time after the "+" is timezone information
+START = "2025-01-01T00:00:00+05:00" #The time after the "+" is timezone information
+#START = "2025-08-05T00:00:00+05:00" #The time after the "+" is timezone information
 END = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
 TELLUS_METRICS = ["bme280.pressure", "sunrise.co2","pms5003t.d2_5"]
 
@@ -41,6 +41,7 @@ IRISH_THREE = os.environ.get("DEVICE_ID_IRISH_THREE")
 
 ### TIME FORMATS ###
 # HOBOLINK: YYYY-MM-DD HH:mm:SS
+# LICOR:    YYYY-MM-DD HH:mm:SS
 # TELLUS:   YYYY-MM-DDTHH:MM:SS+H:MM
 
 device_name_map = {
@@ -52,8 +53,8 @@ device_name_map = {
 def retrieve_data_hobolink(start_time, end_time):
     payload = {
         "loggers": LOGGER_SN,
-        "start_date_time": time_formatter_hobolink(start_time),
-        "end_date_time": time_formatter_hobolink(end_time)
+        "start_date_time": start_time,
+        "end_date_time": end_time
     }
     header = {
         'Authorization': 'Bearer ' + get_new_token(HOBOLINK_AUTH_SERVER, CLIENT_ID, CLIENT_SECRET)
@@ -67,15 +68,15 @@ def retrieve_data_hobolink(start_time, end_time):
     df = pd.DataFrame.from_dict(response.json()["observation_list"])
     return df
 
-def retrieve_data_tellus(start_time, end_time):
+def retrieve_data_tellus(start_time, end_time, devices, metrics):
     header = {'x-api-version': 'v2'}
     host = TELLUS_API + "/data"
     payload = {
         "key": TELLUS_KEY,
-        "deviceId": ','.join([FYE_1, FYE_2, LUCY_CIL]),
+        "deviceId": ','.join(devices),
         'start': start_time,
         'end': end_time,
-        'metric': ",".join(TELLUS_METRICS)
+        'metric': ",".join(metrics)
     }
 
     print("Retrieving TELLUS Data...")
@@ -116,16 +117,19 @@ def retrieve_data_licor(start_time, end_time, devices):
 
 
 if __name__ == "__main__":
-    hobolinkDF = retrieve_data_hobolink(START, END)
+    hobolinkDF = retrieve_data_hobolink(time_formatter_hobolink(START), time_formatter_hobolink(END))
+    print(hobolinkDF)
     #hobolinkDF.to_csv("response.csv")
     #print("CVS written")
     #print(hobolinkDF.head())
 
-    tellusDF = retrieve_data_tellus(START, END)
-    
-    licor_devices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
-    licorDF = retrieve_data_licor(time_formatter_hobolink(START), time_formatter_hobolink(END), licor_devices)
-    print(licorDF)
+    tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
+    tellusDF = retrieve_data_tellus(START, END, tellusDevices, TELLUS_METRICS)
+    print(tellusDF)
+
+    licorDevices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
+    licorDF = retrieve_data_licor(time_formatter_hobolink(START), time_formatter_hobolink(END), licorDevices)
+    #print(licorDF)
 
 
 
