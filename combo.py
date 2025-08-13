@@ -9,7 +9,7 @@ load_dotenv()
 
 #### MANUAL SETTINGS ###
 # Utilize ISO 8601 Standard YYYY-mm-ddTHH:MM:SS+HH:MM
-START = "2025-01-01T00:00:00+05:00" #The time after the "+" is timezone information
+START = "2025-08-01T00:00:00+05:00" #The time after the "+" is timezone information
 #START = "2025-08-05T00:00:00+05:00" #The time after the "+" is timezone information
 END = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
 TELLUS_METRICS = ["bme280.pressure", "sunrise.co2","pms5003t.d2_5"]
@@ -130,14 +130,16 @@ def retrieve_data_licor(start_time, end_time, devices):
 
 
 if __name__ == "__main__":
-    hobolinkDF = retrieve_data_hobolink(time_formatter_hobolink(START), time_formatter_hobolink(END))
-    print(hobolinkDF)
+    hobolink_start = "2025-01-01T00:00:00+05:00"
+    hobolinkDF = retrieve_data_hobolink(time_formatter_hobolink(hobolink_start), time_formatter_hobolink(END))
+    #print(hobolinkDF)
     #hobolinkDF.to_csv("response.csv")
     #print("CVS written")
     #print(hobolinkDF.head())
 
-    #tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
-    #tellusDF = retrieve_data_tellus(START, END, tellusDevices, TELLUS_METRICS)
+    tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
+    tellus_start = "2025-08-01T00:00:00+05:00"
+    tellusDF = retrieve_data_tellus(tellus_start, END, tellusDevices, TELLUS_METRICS)
     #print(tellusDF)
 
     licorDevices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
@@ -146,7 +148,7 @@ if __name__ == "__main__":
 
     #print(licorDF)
 
-    licorDF.to_csv("licor.csv")
+    #licorDF.to_csv("licor.csv")
     #hobolinkDF.to_csv("hobolink.csv")
 
     ### Combine hobolink & licor data
@@ -183,6 +185,24 @@ if __name__ == "__main__":
 
     hobolinkLicorMerge = pd.concat([licorKeyData, hobolinkKeyData], ignore_index=True)
     hobolinkLicorMerge.to_csv("merge.csv")
+
+    ### Add in Tellus Data ###
+
+    tellusSplit = {}
+    for metric in TELLUS_METRICS:
+        tellusColumns = [
+            "timestamp",
+            "nickname",
+            metric
+        ]
+        tellusSplit[metric] = tellusDF[tellusColumns]
+        tellusSplit[metric].rename(columns={metric:"value"}, inplace=True)
+        tellusSplit[metric]["sensor_measurement_type"] = metric
+    tellusRecombined = pd.concat([tellusSplit[metric] for metric in tellusSplit], ignore_index=True)
+    tellusRecombined.rename(columns={"nickname": "station"}, inplace=True)
+
+    allData = pd.concat([hobolinkLicorMerge, tellusRecombined], ignore_index=True)
+    allData.to_csv("merge3.csv")
 
 
 
