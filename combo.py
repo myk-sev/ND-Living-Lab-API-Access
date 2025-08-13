@@ -4,15 +4,18 @@ from dotenv import load_dotenv
 import datetime, os, requests
 import pandas as pd
 from hobolinkutils import get_new_token, time_formatter_hobolink
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 load_dotenv()
 
 #### MANUAL SETTINGS ###
 # Utilize ISO 8601 Standard YYYY-mm-ddTHH:MM:SS+HH:MM
-START = "2025-08-01T00:00:00+05:00" #The time after the "+" is timezone information
+START = "2025-08-10T00:00:00+05:00" #The time after the "+" is timezone information
 #START = "2025-08-05T00:00:00+05:00" #The time after the "+" is timezone information
 END = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
-TELLUS_METRICS = ["bme280.pressure", "sunrise.co2","pms5003t.d2_5"]
+TELLUS_METRICS = ["pms5003t.temperature"]
+#TELLUS_METRICS = ["bme280.pressure", "sunrise.co2","pms5003t.d2_5"]
 
 ### TELLUS SETTINGS ###
 TELLUS_KEY = os.environ.get("TELLUS_KEY")
@@ -128,6 +131,43 @@ def retrieve_data_licor(start_time, end_time, devices):
         print("\t", response.json()['message'])
         sys.exit(1)
 
+def plot_temperature(data):
+    data["timestamp"] = data["timestamp"].apply(datetime.datetime.fromisoformat)
+
+    # Make all temperature data in Fahrenheit
+    #HOBOLINK
+    data.loc[(data["sensor_measurement_type"] == "Temperature") & (data["unit"] == "°C"), "value"] *= 9/5
+    data.loc[(data["sensor_measurement_type"] == "Temperature") & (data["unit"] == "°C"), "value"] += 32
+    data.loc[(data["sensor_measurement_type"] == "Temperature") & (data["unit"] == "°C"), "unit"] = "°F"
+    #TELLUS
+    data.loc[data["sensor_measurement_type"] == "pms5003t.temperature", "value"] *= 9/5
+    data.loc[data["sensor_measurement_type"] == "pms5003t.temperature", "value"] += 32
+    data.loc[data["sensor_measurement_type"] == "pms5003t.temperature", "unit"] = "°F"
+
+    temperatureData = data[data["sensor_measurement_type"].isin(["pms5003t.temperature", "Temperature"])]
+    print("Begin graph generation...")
+    sns.lineplot(temperatureData[:10], x="timestamp", y="value", hue="station")
+    plt.show()
+    print("\t", "10 item graph complete")
+    sns.lineplot(temperatureData[:100], x="timestamp", y="value", hue="station")
+    plt.show()
+    print("\t", "100 item graph complete")
+    sns.lineplot(temperatureData[:1000], x="timestamp", y="value", hue="station")
+    plt.show()
+    print("\t", "1000 item graph complete")
+    sns.lineplot(temperatureData[:10000], x="timestamp", y="value", hue="station")
+    plt.show()
+    print("\t", "10000 item graph complete")
+    sns.lineplot(temperatureData[:100000], x="timestamp", y="value", hue="station")
+    plt.show()
+    print("\t", "100000 item graph complete")
+    sns.lineplot(temperatureData, x="timestamp", y="value", hue="station")
+    plt.show()
+    print("\t", "all item graph complete")
+    print("Completed", "\n")
+
+
+
 
 if __name__ == "__main__":
     hobolink_start = "2025-01-01T00:00:00+05:00"
@@ -203,6 +243,8 @@ if __name__ == "__main__":
 
     allData = pd.concat([hobolinkLicorMerge, tellusRecombined], ignore_index=True)
     allData.to_csv("merge3.csv")
+
+    plot_temperature(allData)
 
 
 
