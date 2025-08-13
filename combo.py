@@ -66,6 +66,10 @@ def retrieve_data_hobolink(start_time, end_time):
 
     if response.status_code == 200:
         df = pd.DataFrame.from_dict(response.json()["observation_list"])
+
+        if df.shape[0] == 100000:
+            print("\t", "Warning: HOBOLink data pull is maxed out. Please choose smaller settings.")
+
         print("Successful", "\n")
         return df
     else:
@@ -113,6 +117,10 @@ def retrieve_data_licor(start_time, end_time, devices):
 
     if response.status_code == 200:
         df = pd.DataFrame(response.json()["data"])
+
+        if df.shape[0] == 100000:
+            print("\t", "Warning: LICOR data pull is maxed out. Please choose smaller settings.")
+
         print("Success", "\n")
         return df
     else:
@@ -128,13 +136,56 @@ if __name__ == "__main__":
     #print("CVS written")
     #print(hobolinkDF.head())
 
-    tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
-    tellusDF = retrieve_data_tellus(START, END, tellusDevices, TELLUS_METRICS)
-    print(tellusDF)
+    #tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
+    #tellusDF = retrieve_data_tellus(START, END, tellusDevices, TELLUS_METRICS)
+    #print(tellusDF)
 
     licorDevices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
+    licorNameMap = {IRISH_ONE:"irishOne", IRISH_TWO:"irishTwo", IRISH_THREE:"irishThree"}
     licorDF = retrieve_data_licor(time_formatter_hobolink(START), time_formatter_hobolink(END), licorDevices)
+
     #print(licorDF)
+
+    licorDF.to_csv("licor.csv")
+    #hobolinkDF.to_csv("hobolink.csv")
+
+    ### Combine hobolink & licor data
+    licorDF["station"] = licorDF["logger_sn"].apply(lambda entry: licorNameMap[entry])
+    licorKeyData = licorDF[[
+        "timestamp",
+        "station",
+        "sensor_sn",
+        "data_type",
+        "value",
+        "unit",
+        "sensor_measurement_type"
+    ]]
+
+    hobolinkDF["station"] = "HOBOLink"
+    hobolinkKeyData = hobolinkDF[[
+        "timestamp",
+        "station",
+        "sensor_sn",
+        "si_value",
+        "si_unit",
+        "sensor_measurement_type"
+    ]]
+
+    licorKeyData.rename(columns={
+        "sensor_sn": "sensor",
+    }, inplace=True)
+
+    hobolinkKeyData.rename(columns={
+        "sensor_sn": "sensor",
+        "si_value": "value",
+        "si_unit": "unit",
+    }, inplace=True)
+
+    hobolinkLicorMerge = pd.concat([licorKeyData, hobolinkKeyData], ignore_index=True)
+    hobolinkLicorMerge.to_csv("merge.csv")
+
+
+
 
 
 
