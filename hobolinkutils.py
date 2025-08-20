@@ -1,10 +1,12 @@
-import datetime, requests, sys, json
+import datetime, json, requests, sys, urllib3
+urllib3.disable_warnings()  # Warnings occur each time a token is generated.
 
 def get_new_token(auth_server_url, client_id, client_secret):
     """Obtain a new OAuth 2.0 token from the authentication server."""
+    
     token_req_payload = {'grant_type': 'client_credentials'}
 
-    print("Retrieving New Token...")
+    #print("Retrieving New Token...")
     token_response = requests.post(auth_server_url,
                                    data=token_req_payload,
                                    verify=False,
@@ -16,7 +18,8 @@ def get_new_token(auth_server_url, client_id, client_secret):
         print("Failed to obtain token from the OAuth 2.0 server")
         sys.exit(1)
     else:
-        print("Successful", "\n")
+        pass
+        #print("Successful", "\n")
 
     tokens = json.loads(token_response.text)
     return tokens['access_token']

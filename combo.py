@@ -54,6 +54,14 @@ device_name_map = {
 }
 
 def retrieve_data_hobolink(start_time, end_time):
+    """
+    Recursively retrieve data from HOBOLink API, automatically handling the 100,000 record limit
+    by splitting time ranges and making additional API calls.
+    
+    Args:
+        start_time: Start time for data retrieval
+        end_time: End time for data retrieval  
+    """        
     payload = {
         "loggers": LOGGER_SN,
         "start_date_time": start_time,
@@ -64,17 +72,25 @@ def retrieve_data_hobolink(start_time, end_time):
     }
     host = f"{HOBOLINK_API}/{USER_ID}"
 
-    print("Retrieving HoboLink Data...")
+    print(f"\tfrom {start_time} to {end_time}")
     response = requests.get(url=host, headers=header, params=payload, verify=True)
 
     if response.status_code == 200:
-        df = pd.DataFrame.from_dict(response.json()["observation_list"])
+        data = pd.DataFrame.from_dict(response.json()["observation_list"])
 
-        if df.shape[0] == 100000:
-            print("\t", "Warning: HOBOLink data pull is maxed out. Please choose smaller settings.")
+        # If result set hits the cap, recursively fetch remaining data
+        if data.shape[0] == 100000: 
+            print(f"\t Warning: Record cap reached. Splitting range...")
+            
+            new_start = pd.to_datetime(data["timestamp"], utc=False, errors="coerce").max()
+            new_start += datetime.timedelta(seconds=1) # Advance by one second to avoid duplicate boundary record
+            new_start = new_start.strftime('%Y-%m-%d %H:%M:%S')
 
-        print("Successful", "\n")
-        return df
+            remaining_data = retrieve_data_hobolink(new_start, end_time)
+            data = pd.concat([data, remaining_data], ignore_index=True)
+
+
+        return data
     else:
         print(f"\t {response.status_code}: {response.json()['error']} {response.json()['error_description']}")
         print("\t", response.json()['message'])
@@ -167,9 +183,7 @@ def plot_temperature(data):
     print("Completed", "\n")
 
 
-
-
-if __name__ == "__main__":
+def generate_temperature_graph(data):
     hobolink_start = "2025-01-01T00:00:00+05:00"
     hobolinkDF = retrieve_data_hobolink(time_formatter_hobolink(hobolink_start), time_formatter_hobolink(END))
     #print(hobolinkDF)
@@ -246,6 +260,15 @@ if __name__ == "__main__":
 
     plot_temperature(allData)
 
+if __name__ == "__main__":
+    hobolink_start = "2025-01-01T00:00:00+05:00"
+    print("Retrieving HoboLink Data...")
+    hobolink_df = retrieve_data_hobolink(time_formatter_hobolink(hobolink_start), time_formatter_hobolink(END))
+    print("Successful", "\n")
+    #print(hobolinkDF)
+    #hobolinkDF.to_csv("response.csv")
+    #print("CVS written")
+    #print(hobolinkDF.head())
 
 
 
