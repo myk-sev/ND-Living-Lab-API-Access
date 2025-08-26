@@ -11,7 +11,7 @@ load_dotenv()
 
 #### MANUAL SETTINGS ###
 # Utilize ISO 8601 Standard YYYY-mm-ddTHH:MM:SS+HH:MM
-START = "2025-08-10T00:00:00+05:00" #The time after the "+" is timezone information
+START = "2025-01-01T00:00:00+05:00" #The time after the "+" is timezone information
 #START = "2025-08-05T00:00:00+05:00" #The time after the "+" is timezone information
 END = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
 TELLUS_METRICS = ["pms5003t.temperature"]
@@ -123,6 +123,18 @@ def retrieve_data_tellus(start_time, end_time, devices, metrics):
 
 
 def retrieve_data_licor(start_time, end_time, devices):
+    """
+    Retrieve data for a specified timespan from the LICOR API.
+
+    Warning: LICOR auto reduces the granularity of results to fit a 100,000 record cap. 
+    This script can split api calls to retrieve the maximum amount of data, but this process is slow.
+    In these cases manual adjustment of ranges is possible.
+    
+    Args:
+        start_time: Start time for data retrieval
+        end_time: End time for data retrieval
+        devices: List of device IDs to retrieve data for
+    """
     header = {
         "Authorization": f"Bearer {LICOR_KEY}"
     }
@@ -131,17 +143,36 @@ def retrieve_data_licor(start_time, end_time, devices):
         "start_date_time": start_time,
         "end_date_time": end_time
     }
-    print("Retrieving LICOR Data...")
+    
+    print(f"Retrieving LICOR Data from {start_time} to {end_time}...")
     response = requests.get(url=LICOR_API, params=payload, headers=header)
 
     if response.status_code == 200:
         df = pd.DataFrame(response.json()["data"])
 
-        if df.shape[0] == 100000:
-            print("\t", "Warning: LICOR data pull is maxed out. Please choose smaller settings.")
+        if df.shape[0] == 100000: # If result set hits the cap, recursively fetch remaining data
+            print(f"\tWarning: LICOR data pull is maxed out ({df.shape[0]} records). Splitting range...")
+            
+           
+            # Calculate midpoint
+            start_dt = pd.to_datetime(start_time)
+            end_dt = pd.to_datetime(end_time)
+            time_diff = end_dt - start_dt
 
-        print("Success", "\n")
-        return df
+            mid_dt = start_dt + time_diff / 2
+            mid_time = mid_dt.strftime('%Y-%m-%d %H:%M:%S') # format
+            
+            # Recursively fetch split requests
+            first_half = retrieve_data_licor(start_time, mid_time, devices)
+            second_half = retrieve_data_licor(mid_time, end_time, devices)
+            
+            # Combine the results
+            combined_df = pd.concat([first_half, second_half], ignore_index=True)
+            print(f"\tSuccessfully combined data: {combined_df.shape[0]} total records")
+            return combined_df
+        else:
+            print(f"\tSuccess: Retrieved {df.shape[0]} records")
+            return df
     else:
         print(f"\t {response.status_code}: {response.json()['error']} {response.json()['error_description']}" )
         print("\t", response.json()['message'])
@@ -261,19 +292,19 @@ def generate_temperature_graph(data):
     plot_temperature(allData)
 
 if __name__ == "__main__":
-    hobolink_start = "2025-01-01T00:00:00+05:00"
-    print("Retrieving HoboLink Data...")
-    hobolink_df = retrieve_data_hobolink(time_formatter_hobolink(hobolink_start), time_formatter_hobolink(END))
-    print("Successful", "\n")
-    #print(hobolinkDF)
-    #hobolinkDF.to_csv("response.csv")
-    #print("CVS written")
-    #print(hobolinkDF.head())
+    # hobolink_start = "2025-01-01T00:00:00+05:00"
+    # print("Retrieving HoboLink Data...")
+    # hobolink_df = retrieve_data_hobolink(time_formatter_hobolink(hobolink_start), time_formatter_hobolink(END))
+    # print("Successful", "\n")
 
 
+    # tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
+    # tellus_start = "2025-08-01T00:00:00+05:00"
+    # tellus_df = retrieve_data_tellus(tellus_start, END, tellusDevices, TELLUS_METRICS)
+    # print(tellus_df)
+    # print(tellus_df.columns)
 
-
-
-
-
-
+    licorDevices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
+    licorNameMap = {IRISH_ONE:"irishOne", IRISH_TWO:"irishTwo", IRISH_THREE:"irishThree"}
+    licor_df = retrieve_data_licor(time_formatter_hobolink(START), time_formatter_hobolink(END), licorDevices)
+    licor_df.to_csv("licor_df.csv")
