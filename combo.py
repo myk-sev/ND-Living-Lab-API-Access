@@ -3,7 +3,7 @@ import sys
 from dotenv import load_dotenv
 import datetime, os, requests
 import pandas as pd
-from hobolinkutils import get_new_token, time_formatter_hobolink
+from utils import get_new_token, time_formatter
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -11,7 +11,7 @@ load_dotenv()
 
 #### MANUAL SETTINGS ###
 # Utilize ISO 8601 Standard YYYY-mm-ddTHH:MM:SS+HH:MM
-START = "2025-01-01T00:00:00+05:00" #The time after the "+" is timezone information
+START = "2025-08-01T00:00:00+05:00" #The time after the "+" is timezone information
 #START = "2025-08-05T00:00:00+05:00" #The time after the "+" is timezone information
 END = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
 TELLUS_METRICS = ["pms5003t.temperature"]
@@ -97,6 +97,20 @@ def retrieve_data_hobolink(start_time, end_time):
         sys.exit(1)
 
 def retrieve_data_tellus(start_time, end_time, devices, metrics):
+    """
+    Retrieve data for a specified timespan from the TELLUS API.
+
+    Warning: TELLUS returns a 413 status code when the requested data set is too large.
+    This function will automatically split the time range and make additional API calls
+    to retrieve all data, but large time ranges may take a while.
+    If this poses an issue, manual adjustment of ranges is recommended.
+    
+    Args:
+        start_time: Start time for data retrieval
+        end_time: End time for data retrieval
+        devices: List of device IDs to retrieve data for
+        metrics: List of metrics to retrieve data for
+    """
     header = {'x-api-version': 'v2'}
     host = TELLUS_API + "/data"
     payload = {
@@ -106,17 +120,32 @@ def retrieve_data_tellus(start_time, end_time, devices, metrics):
         'end': end_time,
         'metric': ",".join(metrics)
     }
-
-    print("Retrieving TELLUS Data...")
+    print(f"\tRetrieving TELLUS Data from {start_time} to {end_time}...")
     response = requests.get(url=host, headers=header, params=payload)
 
     if response.status_code == 200:
         df = pd.DataFrame(response.json())
-        print("Success", "\n")
+        print(f"\tSuccess: Retrieved {df.shape[0]} records from {start_time} to {end_time}")
         return df
     elif response.status_code == 413:
-        print("\t", "Requested data set too large. Please modify dates.")
-        sys.exit(1)
+        print(f"\tWarning: TELLUS data pull is too large (413 error) for {start_time} to {end_time}. Splitting range...")
+        
+        # Calculate midpoint
+        start_dt = pd.to_datetime(start_time)
+        end_dt = pd.to_datetime(end_time)
+        time_diff = end_dt - start_dt
+
+        mid_dt = start_dt + time_diff / 2
+        mid_time = mid_dt.strftime('%Y-%m-%dT%H:%M:%S%z') # ISO 8601 format
+        
+        # Recursively fetch split requests
+        first_half = retrieve_data_tellus(start_time, mid_time, devices, metrics)
+        second_half = retrieve_data_tellus(mid_time, end_time, devices, metrics)
+        
+        # Combine the results
+        combined_df = pd.concat([first_half, second_half], ignore_index=True)
+        print(f"\tSuccessfully combined data: {combined_df.shape[0]} total records")
+        return combined_df
     else:
         print(f"\t {response.status_code}: {response.json()['detail']}")
         sys.exit(1)
@@ -126,9 +155,9 @@ def retrieve_data_licor(start_time, end_time, devices):
     """
     Retrieve data for a specified timespan from the LICOR API.
 
-    Warning: LICOR auto reduces the granularity of results to fit a 100,000 record cap. 
-    This script can split api calls to retrieve the maximum amount of data, but this process is slow.
-    In these cases manual adjustment of ranges is possible.
+    Warning: LICOR reduces the granularity of results to fit a 100,000 record cap. 
+    This function will split api calls to retrieve the all data, but large time ranges may take a while.
+    If this poses an issue, manual adjustment of ranges is recommended.
     
     Args:
         start_time: Start time for data retrieval
@@ -216,7 +245,7 @@ def plot_temperature(data):
 
 def generate_temperature_graph(data):
     hobolink_start = "2025-01-01T00:00:00+05:00"
-    hobolinkDF = retrieve_data_hobolink(time_formatter_hobolink(hobolink_start), time_formatter_hobolink(END))
+    hobolinkDF = retrieve_data_hobolink(time_formatter(hobolink_start), time_formatter(END))
     #print(hobolinkDF)
     #hobolinkDF.to_csv("response.csv")
     #print("CVS written")
@@ -229,7 +258,7 @@ def generate_temperature_graph(data):
 
     licorDevices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
     licorNameMap = {IRISH_ONE:"irishOne", IRISH_TWO:"irishTwo", IRISH_THREE:"irishThree"}
-    licorDF = retrieve_data_licor(time_formatter_hobolink(START), time_formatter_hobolink(END), licorDevices)
+    licorDF = retrieve_data_licor(time_formatter(START), time_formatter(END), licorDevices)
 
     #print(licorDF)
 
@@ -294,17 +323,19 @@ def generate_temperature_graph(data):
 if __name__ == "__main__":
     # hobolink_start = "2025-01-01T00:00:00+05:00"
     # print("Retrieving HoboLink Data...")
-    # hobolink_df = retrieve_data_hobolink(time_formatter_hobolink(hobolink_start), time_formatter_hobolink(END))
+    # hobolink_df = retrieve_data_hobolink(time_formatter(hobolink_start), time_formatter(END))
     # print("Successful", "\n")
 
 
-    # tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
-    # tellus_start = "2025-08-01T00:00:00+05:00"
-    # tellus_df = retrieve_data_tellus(tellus_start, END, tellusDevices, TELLUS_METRICS)
-    # print(tellus_df)
-    # print(tellus_df.columns)
+    tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
+    tellus_start = "2025-01-01T00:00:00+05:00"
+    print("TELLUS retrieval started...")
+    tellus_df = retrieve_data_tellus(tellus_start, END, tellusDevices, TELLUS_METRICS)
+    print("Successful", "\n")
+    print(tellus_df)
+    print(tellus_df.columns)
 
-    licorDevices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
-    licorNameMap = {IRISH_ONE:"irishOne", IRISH_TWO:"irishTwo", IRISH_THREE:"irishThree"}
-    licor_df = retrieve_data_licor(time_formatter_hobolink(START), time_formatter_hobolink(END), licorDevices)
-    licor_df.to_csv("licor_df.csv")
+    # licorDevices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
+    # licorNameMap = {IRISH_ONE:"irishOne", IRISH_TWO:"irishTwo", IRISH_THREE:"irishThree"}
+    # licor_df = retrieve_data_licor(time_formatter(START), time_formatter(END), licorDevices)
+    # licor_df.to_csv("licor_df.csv")
