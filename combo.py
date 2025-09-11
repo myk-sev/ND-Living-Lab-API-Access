@@ -328,12 +328,10 @@ if __name__ == "__main__":
 
 
     tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
-    tellus_start = "2025-01-01T00:00:00+05:00"
     print("TELLUS retrieval started...")
-    tellus_df = retrieve_data_tellus(tellus_start, END, tellusDevices, TELLUS_METRICS)
+    tellus_df = retrieve_data_tellus(START, END, tellusDevices, TELLUS_METRICS)
     print("Successful", "\n")
-    print(tellus_df)
-    print(tellus_df.columns)
+
 
     # licorDevices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
     # licorNameMap = {IRISH_ONE:"irishOne", IRISH_TWO:"irishTwo", IRISH_THREE:"irishThree"}
