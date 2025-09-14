@@ -1,4 +1,4 @@
-import datetime, json, requests, sys, urllib3
+import datetime, json, os, requests, sys, urllib3
 urllib3.disable_warnings()  # Warnings occur each time a token is generated.
 
 def get_new_token(auth_server_url, client_id, client_secret):
@@ -30,22 +30,20 @@ def time_formatter(dt_str):
     hobolink_time = dt_obj.strftime("%Y-%m-%d %H:%M:%S") #IS THIS ACCOUNTING FOR TIMEZONE INFO
     return hobolink_time
 
-def retrieve_tellus_metrics(api_key, devices):
+def retrieve_tellus_metrics(api_key, device_id):
     """Gets all the metrics available for a given device.
     
-    Args:
-        api_key: The API key for the Tellus API
-        devices: A list of device IDs.
+    :api_key str: The API key for the Tellus network.
+    :device_id str: The device id.
 
-    Returns:
-        A dictionary of metrics and their descriptions.
+    :return dict(str, str): Metrics paired to their descriptions.
     """
     host = 'https://api.tellusensors.com' + "/schema"
 
     header = {'x-api-version': 'v2'}
     payload = {
         "key": api_key,
-        "deviceId": ','.join(devices),
+        "deviceId": device_id
     }
 
     response = requests.get(url=host, headers=header, params=payload)
@@ -54,3 +52,9 @@ def retrieve_tellus_metrics(api_key, devices):
     output = {field["name"]: field["description"] for field in data}
 
     return output
+
+def require_env(var_name):
+    value = os.environ.get(var_name)
+    if not value:
+        raise RuntimeError(f"Environment variable {var_name} is required")
+    return value
