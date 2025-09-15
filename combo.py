@@ -1,28 +1,28 @@
 import sys
-
 from dotenv import load_dotenv
 import datetime, os, requests
 import pandas as pd
-from utils import get_new_token, time_formatter
+from utils import get_new_token, time_formatter, require_env, retrieve_tellus_metrics
 import seaborn as sns
 import matplotlib.pyplot as plt
+from sensecap import SenseCAPClient
+from tellus import TellusClient
 
 load_dotenv()
 
 #### MANUAL SETTINGS ###
 # Utilize ISO 8601 Standard YYYY-mm-ddTHH:MM:SS+HH:MM
-START = "2025-08-01T00:00:00+05:00" #The time after the "+" is timezone information
+START = "2025-09-01T00:00:00+05:00" #The time after the "+" is timezone information
 #START = "2025-08-05T00:00:00+05:00" #The time after the "+" is timezone information
 END = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
 TELLUS_METRICS = ["pms5003t.temperature"]
 #TELLUS_METRICS = ["bme280.pressure", "sunrise.co2","pms5003t.d2_5"]
 
 ### TELLUS SETTINGS ###
-TELLUS_KEY = os.environ.get("TELLUS_KEY")
-TELLUS_API = 'https://api.tellusensors.com'
-FYE_1 = os.environ.get("DEVICE_ID_FYE1")
-FYE_2 = os.environ.get("DEVICE_ID_FYE2")
-LUCY_CIL = os.environ.get("DEVICE_ID_CIL")
+TELLUS_KEY = require_env("TELLUS_KEY")
+FYE_1 = require_env("DEVICE_ID_FYE1")
+FYE_2 = require_env("DEVICE_ID_FYE2")
+LUCY_CIL = require_env("DEVICE_ID_CIL")
 
 ### HOBOLINK SETTINGS ###
 HOBOLINK_AUTH_SERVER = "https://webservice.hobolink.com/ws/auth/token"
@@ -32,7 +32,6 @@ USER_ID = os.environ.get("USER_ID")
 CLIENT_ID = os.environ.get("CLIENT_ID")
 CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
 
-
 ### LICOR SETTINGS ###
 LICOR_API = "https://api.licor.cloud/v1/data"
 LICOR_KEY = os.environ.get("LICOR_KEY")
@@ -40,12 +39,16 @@ IRISH_ONE = os.environ.get("DEVICE_ID_IRISH_ONE")
 IRISH_TWO = os.environ.get("DEVICE_ID_IRISH_TWO")
 IRISH_THREE = os.environ.get("DEVICE_ID_IRISH_THREE")
 
-
+### SENSECAP SETTINGS ###
+SENSE_CAP_USER_ID = require_env("SENSE_CAP_USER_ID")
+SENSE_CAP_API_KEY = require_env("SENSE_CAP_API_KEY")
+SENSE_CAP_DEVICE_ID = require_env("SENSE_CAP_DEVICE_ID")
 
 ### TIME FORMATS ###
 # HOBOLINK: YYYY-MM-DD HH:mm:SS
 # LICOR:    YYYY-MM-DD HH:mm:SS
 # TELLUS:   YYYY-MM-DDTHH:MM:SS+H:MM
+# SENSECAP: unix milleseconds
 
 device_name_map = {
     FYE_1: 'FYE_1',
@@ -326,10 +329,17 @@ if __name__ == "__main__":
     # hobolink_df = retrieve_data_hobolink(time_formatter(hobolink_start), time_formatter(END))
     # print("Successful", "\n")
 
-
+    tellusDevices = ["B8D61ABC8E6C"]
+    metrics = [
+        "pms5003t.temperature",
+        "bme280.temperature", 
+        "sunrise.temperature"
+        ]
+        
     tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
+    tellus_client = TellusClient(TELLUS_KEY)
     print("TELLUS retrieval started...")
-    tellus_df = retrieve_data_tellus(START, END, tellusDevices, TELLUS_METRICS)
+    tellus_df = tellus_client.retrieve_data(START, END, tellusDevices, metrics)
     print("Successful", "\n")
 
 
