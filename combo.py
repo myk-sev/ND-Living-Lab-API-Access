@@ -2,7 +2,7 @@ import sys
 from dotenv import load_dotenv
 import datetime, os, requests
 import pandas as pd
-from utils import get_new_token, time_formatter, require_env, retrieve_tellus_metrics
+from utils import get_new_token, time_formatter, require_env
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sensecap import SenseCAPClient
@@ -98,61 +98,6 @@ def retrieve_data_hobolink(start_time, end_time):
         print(f"\t {response.status_code}: {response.json()['error']} {response.json()['error_description']}")
         print("\t", response.json()['message'])
         sys.exit(1)
-
-def retrieve_data_tellus(start_time, end_time, devices, metrics):
-    """
-    Retrieve data for a specified timespan from the TELLUS API.
-
-    Warning: TELLUS returns a 413 status code when the requested data set is too large.
-    This function will automatically split the time range and make additional API calls
-    to retrieve all data, but large time ranges may take a while.
-    If this poses an issue, manual adjustment of ranges is recommended.
-    
-    Args:
-        start_time: Start time for data retrieval
-        end_time: End time for data retrieval
-        devices: List of device IDs to retrieve data for
-        metrics: List of metrics to retrieve data for
-    """
-    header = {'x-api-version': 'v2'}
-    host = TELLUS_API + "/data"
-    payload = {
-        "key": TELLUS_KEY,
-        "deviceId": ','.join(devices),
-        'start': start_time,
-        'end': end_time,
-        'metric': ",".join(metrics)
-    }
-    print(f"\tRetrieving TELLUS Data from {start_time} to {end_time}...")
-    response = requests.get(url=host, headers=header, params=payload)
-
-    if response.status_code == 200:
-        df = pd.DataFrame(response.json())
-        print(f"\tSuccess: Retrieved {df.shape[0]} records from {start_time} to {end_time}")
-        return df
-    elif response.status_code == 413:
-        print(f"\tWarning: TELLUS data pull is too large (413 error) for {start_time} to {end_time}. Splitting range...")
-        
-        # Calculate midpoint
-        start_dt = pd.to_datetime(start_time)
-        end_dt = pd.to_datetime(end_time)
-        time_diff = end_dt - start_dt
-
-        mid_dt = start_dt + time_diff / 2
-        mid_time = mid_dt.strftime('%Y-%m-%dT%H:%M:%S%z') # ISO 8601 format
-        
-        # Recursively fetch split requests
-        first_half = retrieve_data_tellus(start_time, mid_time, devices, metrics)
-        second_half = retrieve_data_tellus(mid_time, end_time, devices, metrics)
-        
-        # Combine the results
-        combined_df = pd.concat([first_half, second_half], ignore_index=True)
-        print(f"\tSuccessfully combined data: {combined_df.shape[0]} total records")
-        return combined_df
-    else:
-        print(f"\t {response.status_code}: {response.json()['detail']}")
-        sys.exit(1)
-
 
 def retrieve_data_licor(start_time, end_time, devices):
     """

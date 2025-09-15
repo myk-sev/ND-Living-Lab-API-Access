@@ -30,29 +30,6 @@ def time_formatter(dt_str):
     hobolink_time = dt_obj.strftime("%Y-%m-%d %H:%M:%S") #IS THIS ACCOUNTING FOR TIMEZONE INFO
     return hobolink_time
 
-def retrieve_tellus_metrics(api_key, device_id):
-    """Gets all the metrics available for a given device.
-    
-    :api_key str: The API key for the Tellus network.
-    :device_id str: The device id.
-
-    :return dict(str, str): Metrics paired to their descriptions.
-    """
-    host = 'https://api.tellusensors.com' + "/schema"
-
-    header = {'x-api-version': 'v2'}
-    payload = {
-        "key": api_key,
-        "deviceId": device_id
-    }
-
-    response = requests.get(url=host, headers=header, params=payload)
-    data = response.json()["fields"]
-
-    output = {field["name"]: field["description"] for field in data}
-
-    return output
-
 def require_env(var_name):
     value = os.environ.get(var_name)
     if not value:

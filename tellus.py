@@ -1,0 +1,114 @@
+import datetime, requests, sys
+from dotenv import load_dotenv
+import pandas as pd
+from utils import require_env
+
+
+class TellusClient:
+    """Client object for interacting with the Tellus API."""
+    HEADER = {'x-api-version': 'v2'}
+    BASE_URL = 'https://api.tellusensors.com'
+
+    def __init__(self, api_key) -> None:
+        self.api_key = api_key
+
+    def retrieve_data(self, start_time: str, end_time: str, devices: list, metrics: list) -> pd.DataFrame:
+        """Retrieve data for a specified timespan as a dataframe.
+
+        Warning: TELLUS returns a 413 status code when the requested data set is too large.
+        This function will automatically split the time range and make additional API calls
+        to retrieve all data, but large time ranges may take a while.
+        If this poses an issue, manual adjustment of ranges is recommended.
+        
+        : start_time str: ISO 8601 format YYYY-MM-DDTHH:MM:SS+H:MM
+        : end_time str: ISO 8601 format YYYY-MM-DDTHH:MM:SS+H:MM
+        : devices list(str): device IDs
+        : metrics list(str): metrics 
+
+        : return pd.DataFrame : Pandas dataframe with timestamp, location, device nickname, data, etc
+        """
+        endpoint = "data"
+        host = f"{self.BASE_URL}/{endpoint}"
+
+        payload = {
+            "key": self.api_key,
+            "deviceId": ','.join(devices),
+            'start': start_time,
+            'end': end_time,
+            'metric': ",".join(metrics)
+        }
+        print(f"\tRetrieving TELLUS Data from {start_time} to {end_time}...")
+        response = requests.get(url=host, headers=self.HEADER, params=payload)
+
+        if response.status_code == 200:
+            df = pd.DataFrame(response.json())
+            print(f"\tSuccess: Retrieved {df.shape[0]} records from {start_time} to {end_time}")
+            return df
+
+        elif response.status_code == 413:
+            print(f"\tWarning: TELLUS data pull is too large (413 error) for {start_time} to {end_time}. Splitting range...")
+            
+            # Calculate midpoint
+            start_dt = pd.to_datetime(start_time)
+            end_dt = pd.to_datetime(end_time)
+            time_diff = end_dt - start_dt
+
+            mid_dt = start_dt + time_diff / 2
+            mid_time = mid_dt.strftime('%Y-%m-%dT%H:%M:%S%z') # ISO 8601 format
+            
+            # Recursively fetch split requests
+            first_half = self.retrieve_data(start_time, mid_time, devices, metrics)
+            second_half = self.retrieve_data(mid_time, end_time, devices, metrics)
+            
+            # Combine the results
+            combined_df = pd.concat([first_half, second_half], ignore_index=True)
+            print(f"\tSuccessfully combined data: {combined_df.shape[0]} total records")
+            return combined_df
+        else:
+            print(f"\t {response.status_code}: {response.json()['detail']}")
+            sys.exit(1)
+
+
+    def retrieve_device_metrics(self, device_id: str) -> dict:
+        """Get all the metrics available for a given device.
+        
+        :device_id str: The device id.
+
+        :return dict(str, str): Metrics paired to their descriptions.
+        """
+        endpoint = "schema"
+        host = f"{self.BASE_URL}/{endpoint}"
+
+        payload = {
+            "key": self.api_key,
+            "deviceId": device_id
+        }
+
+        response = requests.get(url=host, headers=self.HEADER, params=payload)
+        data = response.json()["fields"]
+
+        output = {field["name"]: field["description"] for field in data}
+
+        return output
+
+if __name__ == "__main__":
+    load_dotenv()
+
+    api_key = require_env("TELLUS_KEY")
+
+    fye1_id = require_env("DEVICE_ID_FYE1")
+    fye2_id = require_env("DEVICE_ID_FYE2")
+    lucy_cil_id = require_env("DEVICE_ID_CIL")
+
+    start = "2025-09-01T00:00:00+05:00" 
+    end = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
+
+    tellus_client = TellusClient(api_key)
+    metrics = tellus_client.retrieve_device_metrics(lucy_cil_id)
+
+    for k,v in metrics.items():
+        print(k)
+        print("\t", v)
+
+    data = tellus_client.retrieve_data(start, end, [fye1_id, fye2_id, lucy_cil_id], ["sfa30.temperature"])
+    print(data.head())
