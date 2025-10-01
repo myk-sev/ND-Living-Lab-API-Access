@@ -24,12 +24,6 @@ def get_new_token(auth_server_url, client_id, client_secret):
     tokens = json.loads(token_response.text)
     return tokens['access_token']
 
-def time_formatter(dt_str):
-    """Ensures time entry is compatible with HOBOlink & LICOR APIs: YYYY-MM-DD HH:mm:SS"""
-    dt_obj = datetime.datetime.fromisoformat(dt_str)
-    hobolink_time = dt_obj.strftime("%Y-%m-%d %H:%M:%S") #IS THIS ACCOUNTING FOR TIMEZONE INFO
-    return hobolink_time
-
 def require_env(var_name):
     value = os.environ.get(var_name)
     if not value:

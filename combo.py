@@ -2,11 +2,12 @@ import sys
 from dotenv import load_dotenv
 import datetime, os, requests
 import pandas as pd
-from utils import get_new_token, time_formatter, require_env
+from utils import require_env
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sensecap import SenseCAPClient
 from tellus import TellusClient
+from hobolink import HoboLinkClient
 
 load_dotenv()
 
@@ -49,55 +50,6 @@ SENSE_CAP_DEVICE_ID = require_env("SENSE_CAP_DEVICE_ID")
 # LICOR:    YYYY-MM-DD HH:mm:SS
 # TELLUS:   YYYY-MM-DDTHH:MM:SS+H:MM
 # SENSECAP: unix milleseconds
-
-device_name_map = {
-    FYE_1: 'FYE_1',
-    FYE_2: 'FYE_2',
-    LUCY_CIL: 'Lucy_CIL'
-}
-
-def retrieve_data_hobolink(start_time, end_time):
-    """
-    Recursively retrieve data from HOBOLink API, automatically handling the 100,000 record limit
-    by splitting time ranges and making additional API calls.
-    
-    Args:
-        start_time: Start time for data retrieval
-        end_time: End time for data retrieval  
-    """        
-    payload = {
-        "loggers": LOGGER_SN,
-        "start_date_time": start_time,
-        "end_date_time": end_time
-    }
-    header = {
-        'Authorization': 'Bearer ' + get_new_token(HOBOLINK_AUTH_SERVER, CLIENT_ID, CLIENT_SECRET)
-    }
-    host = f"{HOBOLINK_API}/{USER_ID}"
-
-    print(f"\tfrom {start_time} to {end_time}")
-    response = requests.get(url=host, headers=header, params=payload, verify=True)
-
-    if response.status_code == 200:
-        data = pd.DataFrame.from_dict(response.json()["observation_list"])
-
-        # If result set hits the cap, recursively fetch remaining data
-        if data.shape[0] == 100000: 
-            print(f"\t Warning: Record cap reached. Splitting range...")
-            
-            new_start = pd.to_datetime(data["timestamp"], utc=False, errors="coerce").max()
-            new_start += datetime.timedelta(seconds=1) # Advance by one second to avoid duplicate boundary record
-            new_start = new_start.strftime('%Y-%m-%d %H:%M:%S')
-
-            remaining_data = retrieve_data_hobolink(new_start, end_time)
-            data = pd.concat([data, remaining_data], ignore_index=True)
-
-
-        return data
-    else:
-        print(f"\t {response.status_code}: {response.json()['error']} {response.json()['error_description']}")
-        print("\t", response.json()['message'])
-        sys.exit(1)
 
 def retrieve_data_licor(start_time, end_time, devices):
     """
@@ -192,23 +144,24 @@ def plot_temperature(data):
     print("Completed", "\n")
 
 if __name__ == "__main__":
-    # hobolink_start = "2025-01-01T00:00:00+05:00"
-    # print("Retrieving HoboLink Data...")
-    # hobolink_df = retrieve_data_hobolink(time_formatter(hobolink_start), time_formatter(END))
-    # print("Successful", "\n")
-
-    tellusDevices = ["B8D61ABC8E6C"]
-    metrics = [
-        "pms5003t.temperature",
-        "bme280.temperature", 
-        "sunrise.temperature"
-    ]
-
-    tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
-    tellus_client = TellusClient(TELLUS_KEY)
-    print("TELLUS retrieval started...")
-    tellus_df = tellus_client.retrieve_data(START_TIME, END_TIME, tellusDevices, metrics)
+    hobolink_client = HoboLinkClient(CLIENT_ID, CLIENT_SECRET, USER_ID)
+    
+    print("Retrieving HoboLINK Data...")
+    data = hobolink_client.retrieve_data(START_TIME, END_TIME, LOGGER_SN)
     print("Successful", "\n")
+
+    # tellusDevices = ["B8D61ABC8E6C"]
+    # metrics = [
+    #     "pms5003t.temperature",
+    #     "bme280.temperature", 
+    #     "sunrise.temperature"
+    # ]
+
+    # tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
+    # tellus_client = TellusClient(TELLUS_KEY)
+    # print("TELLUS retrieval started...")
+    # tellus_df = tellus_client.retrieve_data(START_TIME, END_TIME, tellusDevices, metrics)
+    # print("Successful", "\n")
 
     # licorDevices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
     # licorNameMap = {IRISH_ONE:"irishOne", IRISH_TWO:"irishTwo", IRISH_THREE:"irishThree"}
