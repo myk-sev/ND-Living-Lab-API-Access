@@ -1,7 +1,9 @@
-import datetime, requests, sys
+import datetime, requests, sys, json, urllib3
 from dotenv import load_dotenv
 import pandas as pd
-from utils import get_new_token, time_formatter, require_env
+from utils import time_formatter, require_env
+
+urllib3.disable_warnings()  # Warnings occur each time a token is generated.
 
 
 class HoboLinkClient:
@@ -21,11 +23,26 @@ class HoboLinkClient:
         self.user_id = user_id
 
     def _get_auth_token(self) -> str:
-        """Get OAuth2 access token for API authentication.
+        """Obtain a new OAuth 2.0 token from the authentication server.
         
-        :return str: Access token for API requests
+        :return: Access token for API requests
         """
-        return get_new_token(self.AUTH_SERVER, self.client_id, self.client_secret)
+        token_req_payload = {'grant_type': 'client_credentials'}
+
+        token_response = requests.post(self.AUTH_SERVER,
+                                       data=token_req_payload,
+                                       verify=False,
+                                       allow_redirects=False,
+                                       auth=(self.client_id, self.client_secret)
+                                       )
+
+        if token_response.status_code != 200:
+            print("Failed to obtain token from the OAuth 2.0 server")
+            sys.exit(1)
+
+        tokens = json.loads(token_response.text)
+        return tokens['access_token']
+
 
     def retrieve_data(self, start_time: str, end_time: str, logger_sn: str) -> pd.DataFrame:
         """Retrieve data for a specified timespan as a dataframe.
@@ -111,22 +128,7 @@ class HoboLinkClient:
             print("\tNo data retrieved from any logger")
             return pd.DataFrame()
 
-    def get_logger_info(self, logger_sn: str) -> dict:
-        """Get information about a specific logger.
-        
-        Note: This method would require additional API endpoint implementation
-        based on HoboLINK API documentation. Currently returns basic info.
-        
-        :param logger_sn str: Logger serial number
-        
-        :return dict: Logger information
-        """
-        # This would need to be implemented based on HoboLINK API capabilities
-        # For now, return basic structure
-        return {
-            "logger_sn": logger_sn,
-            "note": "Logger info retrieval requires additional API endpoint implementation"
-        }
+
 
 
 if __name__ == "__main__":
