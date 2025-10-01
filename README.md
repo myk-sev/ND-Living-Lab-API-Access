@@ -46,17 +46,28 @@ Dates are input utilizing the ISO 8601 standard. Any conversition to API specifi
 
 
 ### 3) Test configuration and settings
-API access for each platform is split into its own function. These require the start and end time of the request, along with platform specific information. To ensure these have been set correctly try running the script below:
+API access for each platform is split into its own class. These require instantiation with platform specific information followed by a call to retrieve data. These should be as similiar as possible between APIs. To test that setting are correct, each API file is paired with a test script. This script will only run when each individual file is executed. Example below:
 
-```bash
-df_hobolink = retrieve_data_hobolink(time_formatter(START), time_formatter(END))
-df_hobolink.head()
+```python
+load_dotenv()
 
-df_tellus = retrieve_data_tellus(START, END, ["bme280.pressure", "sunrise.co2","pms5003t.d2_5"])
-df_tellus.head()
+### LICOR SETTINGS ###
+LICOR_KEY = require_env("LICOR_KEY")
+IRISH_ONE = require_env("DEVICE_ID_IRISH_ONE")
+IRISH_TWO = require_env("DEVICE_ID_IRISH_TWO")
+IRISH_THREE = require_env("DEVICE_ID_IRISH_THREE")
 
-df_licor = retrieve_data_licor(time_formatter(START), time_formatter(END), [IRISH_ONE, IRISH_TWO, IRISH_THREE])
-df_licor.head()
+start_time = "2025-09-01T00:00:00+05:00"
+end_time = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+licor_client = LicorClient(LICOR_KEY)
+devices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
+
+print("Retrieving LICOR Data...")
+data = licor_client.retrieve_data(start_time, end_time, devices)
+print("Successful", "\n")
+
+print(data.head())
 ```
 
 This will show the first 5 enteries for each data set. Depending on the time stamps provided, HOBOLink may return an empty dataframe. This is ok and means the request was a success. If you would like to see different data try modifing the input.
