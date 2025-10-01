@@ -12,9 +12,9 @@ load_dotenv()
 
 #### MANUAL SETTINGS ###
 # Utilize ISO 8601 Standard YYYY-mm-ddTHH:MM:SS+HH:MM
-START = "2025-09-01T00:00:00+05:00" #The time after the "+" is timezone information
+START_TIME = "2025-09-01T00:00:00+05:00" #The time after the "+" is timezone information
 #START = "2025-08-05T00:00:00+05:00" #The time after the "+" is timezone information
-END = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
+END_TIME = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
 TELLUS_METRICS = ["pms5003t.temperature"]
 #TELLUS_METRICS = ["bme280.pressure", "sunrise.co2","pms5003t.d2_5"]
 
@@ -156,6 +156,7 @@ def retrieve_data_licor(start_time, end_time, devices):
         sys.exit(1)
 
 def plot_temperature(data):
+    #UPDATE THIS TO CONVERT TIMESTAMP TO DT_OBJ
     data["timestamp"] = data["timestamp"].apply(datetime.datetime.fromisoformat)
 
     # Make all temperature data in Fahrenheit
@@ -190,84 +191,6 @@ def plot_temperature(data):
     print("\t", "all item graph complete")
     print("Completed", "\n")
 
-
-def generate_temperature_graph(data):
-    hobolink_start = "2025-01-01T00:00:00+05:00"
-    hobolinkDF = retrieve_data_hobolink(time_formatter(hobolink_start), time_formatter(END))
-    #print(hobolinkDF)
-    #hobolinkDF.to_csv("response.csv")
-    #print("CVS written")
-    #print(hobolinkDF.head())
-
-    tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
-    tellus_start = "2025-08-01T00:00:00+05:00"
-    tellusDF = retrieve_data_tellus(tellus_start, END, tellusDevices, TELLUS_METRICS)
-    #print(tellusDF)
-
-    licorDevices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
-    licorNameMap = {IRISH_ONE:"irishOne", IRISH_TWO:"irishTwo", IRISH_THREE:"irishThree"}
-    licorDF = retrieve_data_licor(time_formatter(START), time_formatter(END), licorDevices)
-
-    #print(licorDF)
-
-    #licorDF.to_csv("licor.csv")
-    #hobolinkDF.to_csv("hobolink.csv")
-
-    ### Combine hobolink & licor data
-    licorDF["station"] = licorDF["logger_sn"].apply(lambda entry: licorNameMap[entry])
-    licorKeyData = licorDF[[
-        "timestamp",
-        "station",
-        "sensor_sn",
-        "data_type",
-        "value",
-        "unit",
-        "sensor_measurement_type"
-    ]]
-
-    hobolinkDF["station"] = "HOBOLink"
-    hobolinkKeyData = hobolinkDF[[
-        "timestamp",
-        "station",
-        "sensor_sn",
-        "si_value",
-        "si_unit",
-        "sensor_measurement_type"
-    ]]
-
-    licorKeyData.rename(columns={
-        "sensor_sn": "sensor",
-    }, inplace=True)
-
-    hobolinkKeyData.rename(columns={
-        "sensor_sn": "sensor",
-        "si_value": "value",
-        "si_unit": "unit",
-    }, inplace=True)
-
-    hobolinkLicorMerge = pd.concat([licorKeyData, hobolinkKeyData], ignore_index=True)
-    hobolinkLicorMerge.to_csv("merge.csv")
-
-    ### Add in Tellus Data ###
-
-    tellusSplit = {}
-    for metric in TELLUS_METRICS:
-        tellusColumns = [
-            "timestamp",
-            "nickname",
-            metric
-        ]
-        tellusSplit[metric] = tellusDF[tellusColumns]
-        tellusSplit[metric].rename(columns={metric:"value"}, inplace=True)
-        tellusSplit[metric]["sensor_measurement_type"] = metric
-    tellusRecombined = pd.concat([tellusSplit[metric] for metric in tellusSplit], ignore_index=True)
-    tellusRecombined.rename(columns={"nickname": "station"}, inplace=True)
-
-    allData = pd.concat([hobolinkLicorMerge, tellusRecombined], ignore_index=True)
-    allData.to_csv("merge3.csv")
-
-    plot_temperature(allData)
-
 if __name__ == "__main__":
     # hobolink_start = "2025-01-01T00:00:00+05:00"
     # print("Retrieving HoboLink Data...")
@@ -279,14 +202,13 @@ if __name__ == "__main__":
         "pms5003t.temperature",
         "bme280.temperature", 
         "sunrise.temperature"
-        ]
-        
+    ]
+
     tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
     tellus_client = TellusClient(TELLUS_KEY)
     print("TELLUS retrieval started...")
-    tellus_df = tellus_client.retrieve_data(START, END, tellusDevices, metrics)
+    tellus_df = tellus_client.retrieve_data(START_TIME, END_TIME, tellusDevices, metrics)
     print("Successful", "\n")
-
 
     # licorDevices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
     # licorNameMap = {IRISH_ONE:"irishOne", IRISH_TWO:"irishTwo", IRISH_THREE:"irishThree"}
