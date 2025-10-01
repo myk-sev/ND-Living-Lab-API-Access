@@ -94,21 +94,25 @@ class TellusClient:
 if __name__ == "__main__":
     load_dotenv()
 
-    api_key = require_env("TELLUS_KEY")
+    ### TELLUS SETTINGS ###
+    TELLUS_KEY = require_env("TELLUS_KEY")
+    FYE_1_ID = require_env("DEVICE_ID_FYE1")
+    FYE_2_ID = require_env("DEVICE_ID_FYE2")
+    LUCY_CIL_ID = require_env("DEVICE_ID_CIL")
 
-    fye1_id = require_env("DEVICE_ID_FYE1")
-    fye2_id = require_env("DEVICE_ID_FYE2")
-    lucy_cil_id = require_env("DEVICE_ID_CIL")
+    start_time = "2025-09-01T00:00:00+05:00" 
+    end_time = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
 
-    start = "2025-09-01T00:00:00+05:00" 
-    end = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
+    tellus_client = TellusClient(TELLUS_KEY)
+    metrics = tellus_client.retrieve_device_metrics(LUCY_CIL_ID)
 
-    tellus_client = TellusClient(api_key)
-    metrics = tellus_client.retrieve_device_metrics(lucy_cil_id)
-
+    print("Device Metrics Available:")
     for k,v in metrics.items():
-        print(k)
-        print("\t", v)
+        print("\t",k)
+        print("\t\t", v)
 
-    data = tellus_client.retrieve_data(start, end, [fye1_id, fye2_id, lucy_cil_id], ["sfa30.temperature"])
+    print("\n", "Retrieving TELLUS Data...")
+    data = tellus_client.retrieve_data(start_time, end_time, [FYE_1_ID, FYE_2_ID, LUCY_CIL_ID], ["sfa30.temperature"])
+    print("Successful", "\n")
+    
     print(data.head())
