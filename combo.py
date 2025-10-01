@@ -1,23 +1,23 @@
-import sys
+import datetime, os, requests, sys
+
 from dotenv import load_dotenv
-import datetime, os, requests
 import pandas as pd
-from utils import require_env
 import seaborn as sns
 import matplotlib.pyplot as plt
+
+from hobolink import HoboLinkClient
+from licor import LicorClient
 from sensecap import SenseCAPClient
 from tellus import TellusClient
-from hobolink import HoboLinkClient
+from utils import require_env
 
 load_dotenv()
 
 #### MANUAL SETTINGS ###
 # Utilize ISO 8601 Standard YYYY-mm-ddTHH:MM:SS+HH:MM
 START_TIME = "2025-09-01T00:00:00+05:00" #The time after the "+" is timezone information
-#START = "2025-08-05T00:00:00+05:00" #The time after the "+" is timezone information
-END_TIME = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
-TELLUS_METRICS = ["pms5003t.temperature"]
-#TELLUS_METRICS = ["bme280.pressure", "sunrise.co2","pms5003t.d2_5"]
+END_TIME = datetime.datetime.now(datetime.timezone.utc).isoformat()
+TELLUS_METRICS = ["bme280.pressure", "sunrise.co2","pms5003t.d2_5"]
 
 ### TELLUS SETTINGS ###
 TELLUS_KEY = require_env("TELLUS_KEY")
@@ -50,62 +50,6 @@ SENSE_CAP_DEVICE_ID = require_env("SENSE_CAP_DEVICE_ID")
 # LICOR:    YYYY-MM-DD HH:mm:SS
 # TELLUS:   YYYY-MM-DDTHH:MM:SS+H:MM
 # SENSECAP: unix milleseconds
-
-def retrieve_data_licor(start_time, end_time, devices):
-    """
-    Retrieve data for a specified timespan from the LICOR API.
-
-    Warning: LICOR reduces the granularity of results to fit a 100,000 record cap. 
-    This function will split api calls to retrieve the all data, but large time ranges may take a while.
-    If this poses an issue, manual adjustment of ranges is recommended.
-    
-    Args:
-        start_time: Start time for data retrieval
-        end_time: End time for data retrieval
-        devices: List of device IDs to retrieve data for
-    """
-    header = {
-        "Authorization": f"Bearer {LICOR_KEY}"
-    }
-    payload = {
-        "loggers": ','.join(devices),
-        "start_date_time": start_time,
-        "end_date_time": end_time
-    }
-    
-    print(f"Retrieving LICOR Data from {start_time} to {end_time}...")
-    response = requests.get(url=LICOR_API, params=payload, headers=header)
-
-    if response.status_code == 200:
-        df = pd.DataFrame(response.json()["data"])
-
-        if df.shape[0] == 100000: # If result set hits the cap, recursively fetch remaining data
-            print(f"\tWarning: LICOR data pull is maxed out ({df.shape[0]} records). Splitting range...")
-            
-           
-            # Calculate midpoint
-            start_dt = pd.to_datetime(start_time)
-            end_dt = pd.to_datetime(end_time)
-            time_diff = end_dt - start_dt
-
-            mid_dt = start_dt + time_diff / 2
-            mid_time = mid_dt.strftime('%Y-%m-%d %H:%M:%S') # format
-            
-            # Recursively fetch split requests
-            first_half = retrieve_data_licor(start_time, mid_time, devices)
-            second_half = retrieve_data_licor(mid_time, end_time, devices)
-            
-            # Combine the results
-            combined_df = pd.concat([first_half, second_half], ignore_index=True)
-            print(f"\tSuccessfully combined data: {combined_df.shape[0]} total records")
-            return combined_df
-        else:
-            print(f"\tSuccess: Retrieved {df.shape[0]} records")
-            return df
-    else:
-        print(f"\t {response.status_code}: {response.json()['error']} {response.json()['error_description']}" )
-        print("\t", response.json()['message'])
-        sys.exit(1)
 
 def plot_temperature(data):
     #UPDATE THIS TO CONVERT TIMESTAMP TO DT_OBJ
@@ -150,20 +94,22 @@ if __name__ == "__main__":
     data = hobolink_client.retrieve_data(START_TIME, END_TIME, LOGGER_SN)
     print("Successful", "\n")
 
-    # tellusDevices = ["B8D61ABC8E6C"]
-    # metrics = [
-    #     "pms5003t.temperature",
-    #     "bme280.temperature", 
-    #     "sunrise.temperature"
-    # ]
+    tellusDevices = ["B8D61ABC8E6C"]
+    metrics = [
+        "pms5003t.temperature",
+        "bme280.temperature", 
+        "sunrise.temperature"
+    ]
 
-    # tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
-    # tellus_client = TellusClient(TELLUS_KEY)
-    # print("TELLUS retrieval started...")
-    # tellus_df = tellus_client.retrieve_data(START_TIME, END_TIME, tellusDevices, metrics)
-    # print("Successful", "\n")
+    tellusDevices = [FYE_1, FYE_2, LUCY_CIL]
+    tellus_client = TellusClient(TELLUS_KEY)
+    print("TELLUS retrieval started...")
+    tellus_df = tellus_client.retrieve_data(START_TIME, END_TIME, tellusDevices, metrics)
+    print("Successful", "\n")
 
-    # licorDevices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
-    # licorNameMap = {IRISH_ONE:"irishOne", IRISH_TWO:"irishTwo", IRISH_THREE:"irishThree"}
-    # licor_df = retrieve_data_licor(time_formatter(START), time_formatter(END), licorDevices)
-    # licor_df.to_csv("licor_df.csv")
+    licorDevices = [IRISH_ONE, IRISH_TWO, IRISH_THREE]
+    licorNameMap = {IRISH_ONE:"irishOne", IRISH_TWO:"irishTwo", IRISH_THREE:"irishThree"}
+    licor_client = LicorClient(LICOR_KEY)
+    print("LICOR data retrieval started...")
+    licor_df = licor_client.retrieve_data(START_TIME, END_TIME, licorDevices)
+    print("Successful", "\n")

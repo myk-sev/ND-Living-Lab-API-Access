@@ -61,7 +61,7 @@ class HoboLinkClient:
         dt_start = datetime.datetime.fromisoformat(start_time)
         start_time = dt_start.strftime("%Y-%m-%d %H:%M:%S") #IS THIS ACCOUNTING FOR TIMEZONE INFO
 
-        dt_end = datetime.datetime.datetime.datetime.fromisoformat(end_time)
+        dt_end = datetime.datetime.fromisoformat(end_time)
         end_time = dt_end.strftime("%Y-%m-%d %H:%M:%S") #IS THIS ACCOUNTING FOR TIMEZONE INFO
         
         endpoint = f"{self.BASE_URL}/{self.user_id}"
@@ -88,8 +88,8 @@ class HoboLinkClient:
                 print(f"\tWarning: HoboLINK record cap reached (100,000 records) for {start_time} to {end_time}. Splitting range...")
                 
                 # Find the latest timestamp in the current data
-                latest_timestamp = pd.to_datetime.datetime(data["timestamp"], utc=False, errors="coerce").max()
-                new_start_dt = latest_timestamp + datetime.datetime.timedelta(seconds=1)  # Advance by one second to avoid duplicate boundary record
+                latest_timestamp = pd.to_datetime(data["timestamp"], utc=False, errors="coerce").max()
+                new_start_dt = latest_timestamp + datetime.timedelta(seconds=1)  # Advance by one second to avoid duplicate boundary record
                 new_start = new_start_dt.strftime('%Y-%m-%dT%H:%M:%S%z')  # Convert back to ISO 8601 format
                 
                 # Recursively fetch remaining data

@@ -20,12 +20,12 @@ class TellusClient:
         to retrieve all data, but large time ranges may take a while.
         If this poses an issue, manual adjustment of ranges is recommended.
         
-        : start_time str: ISO 8601 format YYYY-MM-DDTHH:MM:SS+H:MM
-        : end_time str: ISO 8601 format YYYY-MM-DDTHH:MM:SS+H:MM
-        : devices list(str): device IDs
-        : metrics list(str): metrics 
+        :param start_time: ISO 8601 format YYYY-MM-DDTHH:MM:SS+H:MM
+        :param end_time: ISO 8601 format YYYY-MM-DDTHH:MM:SS+H:MM
+        :param devices: device IDs
+        :param metrics: metrics 
 
-        : return pd.DataFrame : Pandas dataframe with timestamp, location, device nickname, data, etc
+        :return: Pandas dataframe with timestamp, location, device nickname, data, etc
         """
         endpoint = "data"
         host = f"{self.BASE_URL}/{endpoint}"
@@ -72,9 +72,9 @@ class TellusClient:
     def retrieve_device_metrics(self, device_id: str) -> dict:
         """Get all the metrics available for a given device.
         
-        :device_id str: The device id.
+        :param device_id: The device id.
 
-        :return dict(str, str): Metrics paired to their descriptions.
+        :return: Metrics paired to their descriptions.
         """
         endpoint = "schema"
         host = f"{self.BASE_URL}/{endpoint}"
@@ -102,17 +102,12 @@ if __name__ == "__main__":
 
     start_time = "2025-09-01T00:00:00+05:00" 
     end_time = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
+    metrics = ["bme280.pressure", "sunrise.co2","pms5003t.d2_5"]
 
     tellus_client = TellusClient(TELLUS_KEY)
-    metrics = tellus_client.retrieve_device_metrics(LUCY_CIL_ID)
-
-    print("Device Metrics Available:")
-    for k,v in metrics.items():
-        print("\t",k)
-        print("\t\t", v)
-
+    
     print("\n", "Retrieving TELLUS Data...")
-    data = tellus_client.retrieve_data(start_time, end_time, [FYE_1_ID, FYE_2_ID, LUCY_CIL_ID], ["sfa30.temperature"])
+    data = tellus_client.retrieve_data(start_time, end_time, [FYE_1_ID, FYE_2_ID, LUCY_CIL_ID], metrics)
     print("Successful", "\n")
     
     print(data.head())
