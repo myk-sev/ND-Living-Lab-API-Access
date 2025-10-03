@@ -100,7 +100,24 @@ class TellusClient:
             print(f"\t {response.status_code}: {response.json()['detail']}")
             sys.exit(1)
 
-        
+    def retrieve_raw_request_data(self, device_ids: list[str], endpoint: str="data", metrics: list[str]=[]) - requests.models.Response:
+        """Deugging tool. Get API response without post-processing
+
+        :param device_ids: devices to retrieve data from
+        :endpoint: the api branch to interact with, unless otherwise specified "data"
+        :metrics: sensors to retrieve data from
+
+        :return: raw api output
+        """
+        host = f"{self.BASE_URL}/{endpoint}"
+        payload = {
+            "key": self.api_key,
+            "deviceId": ",".join(device_ids)
+        }
+        if metrics != []: payload[metrics] = ",".join(metrics)
+
+        response = requests.get(url=host, headers=self.HEADER, params=payload)
+        return response
 
 if __name__ == "__main__":
     load_dotenv()
