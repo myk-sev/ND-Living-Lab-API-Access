@@ -45,6 +45,8 @@ class TellusClient:
             print(f"\tSuccess: Retrieved {df.shape[0]} records from {start_time} to {end_time}")
             return df
 
+        elif response.status_code == 403: print(f"Warning: {response.json()['detail']}")
+
         elif response.status_code == 413:
             print(f"\tWarning: TELLUS data pull is too large (413 error) for {start_time} to {end_time}. Splitting range...")
             
@@ -69,12 +71,12 @@ class TellusClient:
             sys.exit(1)
 
 
-    def retrieve_device_metrics(self, device_id: str) -> dict:
+    def retrieve_device_metrics(self, device_id: str) -> tuple(dict | str):
         """Get all the metrics available for a given device.
         
         :param device_id: The device id.
 
-        :return: Metrics paired to their descriptions.
+        :return: Metrics paired to their descriptions and any potential error messages.
         """
         endpoint = "schema"
         host = f"{self.BASE_URL}/{endpoint}"
@@ -85,11 +87,20 @@ class TellusClient:
         }
 
         response = requests.get(url=host, headers=self.HEADER, params=payload)
-        data = response.json()["fields"]
 
-        output = {field["name"]: field["description"] for field in data}
+        if response.status_code == 200:
+            data = response.json()["fields"]
+            output = {field["name"]: field["description"] for field in data}
+            return output, 
 
-        return output
+        elif response.status_code == 403: 
+            print(f"Warning: {response.json()['detail']}")
+
+        else:
+            print(f"\t {response.status_code}: {response.json()['detail']}")
+            sys.exit(1)
+
+        
 
 if __name__ == "__main__":
     load_dotenv()
@@ -101,7 +112,7 @@ if __name__ == "__main__":
     LUCY_CIL_ID = require_env("DEVICE_ID_CIL")
 
     start_time = "2025-09-01T00:00:00+05:00" 
-    end_time = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
+    end_time = datetime.datetime.now(datetime.timezone.utc).isoformat()
     metrics = ["bme280.pressure", "sunrise.co2","pms5003t.d2_5"]
 
     tellus_client = TellusClient(TELLUS_KEY)
