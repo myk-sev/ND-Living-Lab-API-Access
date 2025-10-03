@@ -71,12 +71,12 @@ class TellusClient:
             sys.exit(1)
 
 
-    def retrieve_device_metrics(self, device_id: str) -> tuple(dict | str):
+    def retrieve_device_metrics(self, device_id: str) -> dict:
         """Get all the metrics available for a given device.
         
         :param device_id: The device id.
 
-        :return: Metrics paired to their descriptions and any potential error messages.
+        :return: Metrics paired to their descriptions
         """
         endpoint = "schema"
         host = f"{self.BASE_URL}/{endpoint}"
@@ -91,7 +91,7 @@ class TellusClient:
         if response.status_code == 200:
             data = response.json()["fields"]
             output = {field["name"]: field["description"] for field in data}
-            return output, 
+            return output
 
         elif response.status_code == 403: 
             print(f"Warning: {response.json()['detail']}")
@@ -100,21 +100,32 @@ class TellusClient:
             print(f"\t {response.status_code}: {response.json()['detail']}")
             sys.exit(1)
 
-    def retrieve_raw_request_data(self, device_ids: list[str], endpoint: str="data", metrics: list[str]=[]) - requests.models.Response:
+    def retrieve_raw_request_data(self, device_ids: list[str],
+            endpoint: str="data", 
+            metrics: list[str]=[],
+            start_time: str="",
+            end_time: str=datetime.datetime.now().isoformat()
+            ) -> requests.models.Response:
         """Deugging tool. Get API response without post-processing
 
         :param device_ids: devices to retrieve data from
-        :endpoint: the api branch to interact with, unless otherwise specified "data"
-        :metrics: sensors to retrieve data from
+        :param endpoint: the api branch to interact with, unless otherwise specified "data"
+        :param metrics: sensors to retrieve data from (optional)
+        :param start_time: ISO 8601 format YYYY-MM-DDTHH:MM:SS+H:MM (optional, endpoint dependent)
+        :param end_time: ISO 8601 format YYYY-MM-DDTHH:MM:SS+H:MM (optional, endpoint dependent)
 
-        :return: raw api output
+        :return: api output
         """
         host = f"{self.BASE_URL}/{endpoint}"
         payload = {
             "key": self.api_key,
             "deviceId": ",".join(device_ids)
         }
-        if metrics != []: payload[metrics] = ",".join(metrics)
+
+        if metrics != []: payload["metrics"] = ",".join(metrics)
+        if start_time != str(): 
+            payload["start"] = start_time
+            payload["end"] = end_time
 
         response = requests.get(url=host, headers=self.HEADER, params=payload)
         return response
