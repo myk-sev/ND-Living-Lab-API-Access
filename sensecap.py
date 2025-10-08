@@ -16,6 +16,9 @@ class SenseCAPClient:
         payload = response.json()
         if isinstance(payload, dict) and str(payload.get("code")) != "0":
             raise RuntimeError(f"SenseCAP API error: {payload.get('msg')} ({payload.get('code')})")
+
+        if payload.get("data") == []:
+            print("Warning: Empty data set retrieved.")
         return payload
 
     def retrieve_device_ids(self) -> dict[str, str]:
@@ -98,13 +101,13 @@ class SenseCAPClient:
         """Can retrieve data up to 1 year old. Default interval is 60 mins.
 
         :param string device_id: device extended unique identifier
-        :param string time_start: iso 8061 time
-        :param string time_end: iso 8061 time
+        :param string time_start: iso 8061 time YYYY-MM-DDTHH:MM:SS+H:MM
+        :param string time_end: iso 8061 time YYYY-MM-DDTHH:MM:SS+H:MM
         :param string channel_index: channel to query data from
         :param string sensor_id: sensor ID
         :param int interval: the length of the time period to get, unit minute.
 
-        :return dataframe: 
+        :return dataframe: aggregate data
         """
         endpoint = "aggregate_chart_points"
 
@@ -112,8 +115,8 @@ class SenseCAPClient:
             "device_eui": device_id,
         }
 
-        if time_start != "": payload["time_start"] = datetime.datetime.fromisoformat(time_start).timestamp() * 1000 #if not specified the default is one day ago
-        if time_end != "": payload["time_end"] = datetime.datetime.fromisoformat(time_end).timestamp() * 1000 #if not specified the default is now
+        if time_start != "": payload["time_start"] = int(datetime.datetime.fromisoformat(time_start).timestamp() * 1000) #if not specified the default is one day ago
+        if time_end != "": payload["time_end"] = int(datetime.datetime.fromisoformat(time_end).timestamp() * 1000) #if not specified the default is now
         if channel_index != "": payload["channel_index"] = channel_index
         if sensor_id != "": payload["measurement_id"] = sensor_id
         if interval != 0: payload["interval"] = interval #default is 60 minutes
@@ -137,8 +140,37 @@ class SenseCAPClient:
             raise RuntimeError("Unexpected response shape for channel list")
         return channels
 
+    def retrieve_raw_request_data(self, endpoint: str, payload: dict | None = None) -> requests.models.Response:
+        """Debugging tool. Return raw API response without post-processing.
+
+        :param endpoint: API endpoint path relative to base (e.g., "view_latest_telemetry_data")
+        :param params: Query parameters to include in the request
+
+        :return: Raw requests Response
+        """
+        url = f"{self.BASE_URL}/{endpoint}"
+        response = requests.get(url, auth=self.auth, params=payload or {})
+        return response
+
+def plot_data(data, title, y_col, time_col = "timestamp"):
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
+    data[time_col] = pd.to_datetime(data[time_col])
+
+    plt.xticks(rotation=45)
+    plt.title(title)
+    sns.lineplot(data, x=time_col, y=y_col)
+    plt.show()
+
 if __name__ == "__main__":
     api_id = require_env("SENSE_CAP_USER_ID")
     api_key = require_env("SENSE_CAP_API_KEY")
     client = SenseCAPClient(api_id, api_key)
     devices = client.retrieve_device_ids()
+
+    start = "2025-10-01T00:00:00"
+    device_id = "2CF7F1C0708000D7"
+
+    #data = client.get_historic_data(device_id, time_start=start)
+    #print(data)
