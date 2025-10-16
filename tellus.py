@@ -27,6 +27,23 @@ class TellusClient:
 
         :return: Pandas dataframe with timestamp, location, device nickname, data, etc
         """
+
+        def normalize_metrics(data: pd.DataFrame) -> pd.DataFrame:
+            """Split measurements into seperate columns based on source sensor.
+
+            :param data: output of api call
+            :return: normalized output
+            """
+            split_data = []
+            for sensor in metrics:
+                sensor_df = data.loc[:, ["timestamp", "deviceId", sensor]]
+                sensor_df.loc[:, "sensor"] = sensor
+                sensor_df = sensor_df.rename(columns={sensor:"measurement"})
+                split_data.append(sensor_df)
+
+            recombined_data = pd.concat(split_data, ignore_index=True)
+            return recombined_data
+
         endpoint = "data"
         host = f"{self.BASE_URL}/{endpoint}"
 
@@ -41,9 +58,9 @@ class TellusClient:
         response = requests.get(url=host, headers=self.HEADER, params=payload)
 
         if response.status_code == 200:
-            df = pd.DataFrame(response.json())
-            print(f"\tSuccess: Retrieved {df.shape[0]} records from {start_time} to {end_time}")
-            return df
+            data = pd.DataFrame(response.json())
+            print(f"\tSuccess: Retrieved {data.shape[0]} records from {start_time} to {end_time}")
+            return data
 
         elif response.status_code == 403: print(f"Warning: {response.json()['detail']}")
 
@@ -63,9 +80,9 @@ class TellusClient:
             second_half = self.retrieve_data(mid_time, end_time, devices, metrics)
             
             # Combine the results
-            combined_df = pd.concat([first_half, second_half], ignore_index=True)
-            print(f"\tSuccessfully combined data: {combined_df.shape[0]} total records")
-            return combined_df
+            combined_data = pd.concat([first_half, second_half], ignore_index=True)
+            print(f"\tSuccessfully combined data: {combined_data.shape[0]} total records")
+            return combined_data
         else:
             print(f"\t {response.status_code}: {response.json()['detail']}")
             sys.exit(1)
@@ -139,7 +156,7 @@ if __name__ == "__main__":
     FYE_2_ID = require_env("DEVICE_ID_FYE2")
     LUCY_CIL_ID = require_env("DEVICE_ID_CIL")
 
-    start_time = "2025-09-01T00:00:00+05:00" 
+    start_time = "2025-10-01T00:00:00+05:00" 
     end_time = datetime.datetime.now(datetime.timezone.utc).isoformat()
     metrics = ["bme280.pressure", "sunrise.co2","pms5003t.d2_5"]
 
