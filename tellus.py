@@ -11,8 +11,27 @@ class TellusClient:
 
     def __init__(self, api_key) -> None:
         self.api_key = api_key
-
+    
     def retrieve_data(self, start_time: str, end_time: str, devices: list, metrics: list) -> pd.DataFrame:
+        """Clean up and format API output for analysis workflows.
+        
+        parameter information detailed in _retrieve_data
+        """
+        api_output = self._retrieve_data(start_time, end_time, devices, metrics) #baseoutput
+
+        if api_output.empty: return api_output #in event of an error return the empty dataframe
+
+        flattened_output = self.flatten_measurements(api_output, metrics)
+        dt_obj_conversion = self.standardize_time(flattened_output) #convert time strings to dt_objs
+
+        # correct output for timezone offset
+        dt_start_time = datetime.datetime.fromisoformat(start_time)
+        timezone_offset = int(dt_start_time.utcoffset().total_seconds() / 3600)
+        dt_obj_conversion["timestamp"] = dt_obj_conversion["timestamp"].apply(lambda entry: entry + pd.Timedelta(hours=timezone_offset))
+
+        return dt_obj_conversion
+
+    def _retrieve_data(self, start_time: str, end_time: str, devices: list, metrics: list) -> pd.DataFrame:
         """Retrieve data for a specified timespan as a dataframe.
 
         Warning: TELLUS returns a 413 status code when the requested data set is too large.
@@ -20,30 +39,13 @@ class TellusClient:
         to retrieve all data, but large time ranges may take a while.
         If this poses an issue, manual adjustment of ranges is recommended.
         
-        :param start_time: ISO 8601 format YYYY-MM-DDTHH:MM:SS+H:MM
-        :param end_time: ISO 8601 format YYYY-MM-DDTHH:MM:SS+H:MM
+        :param start_time: ISO 8601 format YYYY-MM-DDTHH:MM:SS+HH:MM
+        :param end_time: ISO 8601 format YYYY-MM-DDTHH:MM:SS+HH:MM
         :param devices: device IDs
         :param metrics: metrics 
 
         :return: Pandas dataframe with timestamp, location, device nickname, data, etc
         """
-
-        def normalize_metrics(data: pd.DataFrame) -> pd.DataFrame:
-            """Split measurements into seperate columns based on source sensor.
-
-            :param data: output of api call
-            :return: normalized output
-            """
-            split_data = []
-            for sensor in metrics:
-                sensor_df = data.loc[:, ["timestamp", "deviceId", sensor]]
-                sensor_df.loc[:, "sensor"] = sensor
-                sensor_df = sensor_df.rename(columns={sensor:"measurement"})
-                split_data.append(sensor_df)
-
-            recombined_data = pd.concat(split_data, ignore_index=True)
-            return recombined_data
-
         endpoint = "data"
         host = f"{self.BASE_URL}/{endpoint}"
 
@@ -62,7 +64,9 @@ class TellusClient:
             print(f"\tSuccess: Retrieved {data.shape[0]} records from {start_time} to {end_time}")
             return data
 
-        elif response.status_code == 403: print(f"Warning: {response.json()['detail']}")
+        elif response.status_code == 403: 
+            print(f"Warning: {response.json()['detail']}")
+            return pd.DataFrame()
 
         elif response.status_code == 413:
             print(f"\tWarning: TELLUS data pull is too large (413 error) for {start_time} to {end_time}. Splitting range...")
@@ -147,6 +151,35 @@ class TellusClient:
         response = requests.get(url=host, headers=self.HEADER, params=payload)
         return response
 
+    @staticmethod
+    def flatten_measurements(data: pd.DataFrame, metrics: list[str]) -> pd.DataFrame:
+        """Combine measurements into a single column. A new column is set up specifying the source sensor.
+
+        :param data: output of api call
+        :param metrics: the senors present in the data set
+
+        :return: normalized output
+        """
+        split_data = []
+        for sensor in metrics:
+            sensor_df = data.loc[:, ["timestamp", "deviceId", sensor]]
+            sensor_df.loc[:, "sensor"] = sensor
+            sensor_df = sensor_df.rename(columns={sensor:"measurement"})
+            split_data.append(sensor_df)
+
+        recombined_data = pd.concat(split_data, ignore_index=True)
+        return recombined_data
+
+    @staticmethod
+    def standardize_time(data: pd.DataFrame) -> pd.DataFrame:
+        """Convert api time output to datetime objects.
+        
+        :param data: api output
+        :return: converted api output
+        """
+        data["timestamp"] = pd.to_datetime(data["timestamp"])
+        return data
+
 if __name__ == "__main__":
     load_dotenv()
 
@@ -156,14 +189,14 @@ if __name__ == "__main__":
     FYE_2_ID = require_env("DEVICE_ID_FYE2")
     LUCY_CIL_ID = require_env("DEVICE_ID_CIL")
 
-    start_time = "2025-10-01T00:00:00+05:00" 
+    start_time = "2025-10-01T00:00:00-05:00" 
     end_time = datetime.datetime.now(datetime.timezone.utc).isoformat()
     metrics = ["bme280.pressure", "sunrise.co2","pms5003t.d2_5"]
 
-    tellus_client = TellusClient(TELLUS_KEY)
+    client = TellusClient(TELLUS_KEY)
     
     print("\n", "Retrieving TELLUS Data...")
-    data = tellus_client.retrieve_data(start_time, end_time, [FYE_1_ID, FYE_2_ID, LUCY_CIL_ID], metrics)
+    data = client.retrieve_data(start_time, end_time, [FYE_1_ID, FYE_2_ID, LUCY_CIL_ID], metrics)
     print("Successful", "\n")
     
-    print(data.head())
+    print(data)
