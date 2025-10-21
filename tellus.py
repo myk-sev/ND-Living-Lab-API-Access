@@ -115,10 +115,10 @@ class TellusClient:
             return output
 
         elif response.status_code == 403: 
-            print(f"Warning: {response.json()['detail']}")
+            print(f"Warning: {response.json()['msg']}")
 
         else:
-            print(f"\t {response.status_code}: {response.json()['detail']}")
+            print(f"\t {response.status_code}: {response.json()['msg']}")
             sys.exit(1)
 
     def retrieve_raw_request_data(self, device_ids: list[str],
@@ -143,13 +143,13 @@ class TellusClient:
             "deviceId": ",".join(device_ids)
         }
 
-        if metrics != []: payload["metrics"] = ",".join(metrics)
+        if metrics != []: payload["metric"] = ",".join(metrics)
         if start_time != str(): 
             payload["start"] = start_time
             payload["end"] = end_time
 
         response = requests.get(url=host, headers=self.HEADER, params=payload)
-        return response
+        return response, payload
 
     @staticmethod
     def flatten_measurements(data: pd.DataFrame, metrics: list[str]) -> pd.DataFrame:
