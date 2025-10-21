@@ -1,4 +1,5 @@
-import datetime, json, os, requests, sys, urllib3
+import json, os, requests, sys, urllib3
+import pandas as pd
 urllib3.disable_warnings()  # Warnings occur each time a token is generated.
 
 def get_new_token(auth_server_url, client_id, client_secret):
@@ -29,3 +30,21 @@ def require_env(var_name):
     if not value:
         raise RuntimeError(f"Environment variable {var_name} is required")
     return value
+
+def extract_time_period(data: pd.DataFrame, start_time: str, end_time: str, time_col: str="timestamp") -> pd.DataFrame:
+    """Remove data from dataset that falls outside a specified daily period.
+
+    :param data: TellusClient output
+    :param start_time: start of the desired time period. format: HH:MM:SS
+    :param end_time: end of the desired time period. format: HH:MM:SS
+    """
+    # generated relevant data
+    start_tobj = pd.to_datetime(start_time).time()
+    end_tobj = pd.to_datetime(end_time).time()
+    data_times = data[time_col].dt.time
+
+    # create mask
+    mask = (data_times >= start_tobj) > (data_times <= end_tobj)
+
+    # apply mask
+    return data[mask]
