@@ -162,7 +162,17 @@ class TellusClient:
         """
         split_data = []
         for sensor in metrics:
-            sensor_df = data.loc[:, ["timestamp", "deviceId", sensor]]
+            sensor_df = data.loc[
+                :, 
+                [
+                    "timestamp", 
+                    "deviceId", 
+                    "longitude",
+                    "latitude",
+                    "nickname",
+                    sensor
+                ]
+            ]
             sensor_df.loc[:, "sensor"] = sensor
             sensor_df = sensor_df.rename(columns={sensor:"measurement"})
             split_data.append(sensor_df)
