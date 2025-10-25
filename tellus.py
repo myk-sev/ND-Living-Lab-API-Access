@@ -17,17 +17,18 @@ class TellusClient:
         
         parameter information detailed in _retrieve_data
         """
-        api_output = self._retrieve_data(start_time, end_time, devices, metrics) #baseoutput
+        api_output = self._retrieve_data(start_time, end_time, devices, metrics) # baseoutput
 
-        if api_output.empty: return api_output #in event of an error return the empty dataframe
+        if api_output.empty: return api_output # in event of an error return the empty dataframe
 
         flattened_output = self.flatten_measurements(api_output, metrics)
-        dt_obj_conversion = self.standardize_time(flattened_output) #convert time strings to dt_objs
+        dt_obj_conversion = self.standardize_time(flattened_output) # convert time strings to dt_objs
 
         # correct output for timezone offset
         dt_start_time = datetime.datetime.fromisoformat(start_time)
-        timezone_offset = int(dt_start_time.utcoffset().total_seconds() / 3600)
-        dt_obj_conversion["timestamp"] = dt_obj_conversion["timestamp"].apply(lambda entry: entry + pd.Timedelta(hours=timezone_offset))
+        if dt_start_time.utcoffset(): # when no timezone is specified this will return a null
+            timezone_offset = int(dt_start_time.utcoffset().total_seconds() / 3600)
+            dt_obj_conversion["timestamp"] = dt_obj_conversion["timestamp"].apply(lambda entry: entry + pd.Timedelta(hours=timezone_offset))
 
         return dt_obj_conversion
 
