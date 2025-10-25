@@ -1,4 +1,4 @@
-import json, os, requests, sys, urllib3
+import datetime, json, os, requests, sys, urllib3
 import pandas as pd
 urllib3.disable_warnings()  # Warnings occur each time a token is generated.
 
@@ -44,7 +44,21 @@ def extract_time_period(data: pd.DataFrame, start_time: str, end_time: str, time
     data_times = data[time_col].dt.time
 
     # create mask
-    mask = (data_times >= start_tobj) > (data_times <= end_tobj)
+    mask = (data_times >= start_tobj) & (data_times <= end_tobj)
 
     # apply mask
     return data[mask]
+
+def validate_date(date_str: str) -> None:
+    """Ensures that the date provided is of "YYYY-MM-DD" format.
+
+    :param date_str: the date to be checked
+    :raises ValueError: occures when an incorrect format is found
+    """
+    try:
+        datetime.datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        raise ValueError(f"Date must be in YYYY-MM-DD format, got: {date_str}")
+
+
+
