@@ -1,4 +1,5 @@
 import datetime, json, os, requests, sys, urllib3
+from datetime import datetime as dt, timedelta
 import pandas as pd
 urllib3.disable_warnings()  # Warnings occur each time a token is generated.
 
@@ -60,5 +61,38 @@ def validate_date(date_str: str) -> None:
     except ValueError:
         raise ValueError(f"Date must be in YYYY-MM-DD format, got: {date_str}")
 
+
+def get_month_weeks(year: int, month: int) -> list[tuple[dt, dt]]:
+    """Generate start and end datetime timestamps for each week in a specified month.
+
+    :param year: e.g. 2024
+    :param month: 1-12
+    :return: start and end datetime object for each week in the month
+    """
+    # Get first and last day of the month
+    first_day = dt(year, month, 1)
+    next_month = dt(year + 1, 1, 1) if month == 12 else dt(year, month + 1, 1)
+    last_day = next_month - timedelta(days=1)
+    
+    # Find the Sunday before or on the first day (weekday: 0=Mon, 6=Sun)
+    week_start = first_day - timedelta(days=(first_day.weekday() + 1) % 7)
+    
+    weeks = []
+    while week_start <= last_day:
+        week_end = week_start + timedelta(days=6)
+        
+        # Count days in this week that fall within the target month
+        days_in_month = sum(1 for i in range(7) 
+                           if (week_start + timedelta(days=i)).month == month)
+        
+        # Include week if 4+ days are in the month
+        if days_in_month >= 4:
+            start_ts = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_ts = week_end.replace(hour=23, minute=59, second=59, microsecond=999999)
+            weeks.append((start_ts, end_ts))
+        
+        week_start += timedelta(days=7)
+    
+    return weeks
 
 
