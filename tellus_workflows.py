@@ -15,6 +15,25 @@ def generate_night_temperature_averages(client: TellusClient, device_ids: list[s
 
     :return nightly_averages: the average temperature from 2am-4am for each day and device provided 
     """
+    data = retrieve_data_between_days(client, device_ids=device_ids, start_day=start_day, end_day=end_day, metrics=metrics, time_zone_delta=time_zone_delta)
+
+    night_data = extract_time_period(data, "02:00", "04:00")
+    night_data["date"] = night_data["timestamp"].dt.date
+    pivot_table = night_data.pivot_table(index="date", columns="deviceId", values="measurement", aggfunc="mean")
+    return pivot_table
+
+def retrieve_data_between_days(client: TellusClient, device_ids: list[str], start_day: str, end_day: str, metrics: list[str]=["sunrise.temperature"], time_zone_delta: int=-5):
+    """Retrieve data for days specified.
+
+    :param client: instantiated TellusClient object
+    :param device_ids: devices to retrieve data from
+    :param start_day: format YYYY-MM-DD
+    :param end_day: format YYYY-MM-DD
+    :param metrics: sensors to retrieve data from. sunrise is the default.
+    :param time_zone_delta: hour offset for the target timezone
+
+    :return complete_df: all data each day and device provided 
+    """
     validate_date(start_day)
     validate_date(end_day)
 
@@ -33,8 +52,4 @@ def generate_night_temperature_averages(client: TellusClient, device_ids: list[s
             responses.append(data)
 
     complete_df = pd.concat(responses, ignore_index=True)
-
-    night_data = extract_time_period(complete_df, "02:00", "04:00")
-    night_data["date"] = night_data["timestamp"].dt.date
-    pivot_table = night_data.pivot_table(index="date", columns="deviceId", values="measurement", aggfunc="mean")
-    return pivot_table
+    return complete_df
