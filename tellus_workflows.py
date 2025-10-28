@@ -3,6 +3,39 @@ from tellus import TellusClient
 from utils import extract_time_period, validate_date
 import datetime
 
+def generate_geospatial_enabled_average(client: TellusClient, device_ids: list[str], start_day: str, end_day: str, metrics: list[str]=["sunrise.temperature"], time_zone_delta: int=-5):
+    """Retrieve average per device for a time period. Retain location data in output.
+
+    :param client: instantiated TellusClient object
+    :param device_ids: devices to retrieve data from
+    :param start_day: format YYYY-MM-DD
+    :param end_day: format YYYY-MM-DD
+    :param metrics: sensors to retrieve data from. sunrise is the default.
+    :param time_zone_delta: hour offset for the target timezone
+
+    :return final_df: all data each day and device provided 
+    """
+    data = retrieve_data_between_days(client, device_ids=device_ids, start_day=start_day, end_day=end_day, metrics=metrics, time_zone_delta=time_zone_delta)
+    night_data = extract_time_period(data, "02:00", "04:00")
+
+    # extract out metadata for each tellus unit
+    core_data = []
+    for device_id in night_data["deviceId"].unique():
+        device_data = night_data[night_data["deviceId"] == device_id].iloc[0]
+        core_data.append(device_data)
+    core_df = pd.concat(core_data, axis=1, ignore_index=True).T
+
+    # average data for each device
+    time_period_averages = night_data.groupby("deviceId")["measurement"].mean()
+    time_period_averages = time_period_averages.rename_axis("deviceId").reset_index() #convert to df
+
+    # combine metadata with averages
+    final_df = pd.merge(core_df, time_period_averages, on="deviceId")
+    final_df = final_df.drop(["measurement_x", "timestamp"], axis=1)
+    final_df = final_df.rename(columns={"measurement_y": "weekly_average"})
+
+    return final_df
+
 def generate_night_temperature_averages(client: TellusClient, device_ids: list[str], start_day: str, end_day: str, metrics: list[str]=["sunrise.temperature"], time_zone_delta: int=-5):
     """Calculate the average temperature from 2am-4am for each day and device provided.
 
