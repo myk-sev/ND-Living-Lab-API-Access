@@ -8,6 +8,7 @@ class TellusClient:
     """Client object for interacting with the Tellus API."""
     HEADER = {'x-api-version': 'v2'}
     BASE_URL = 'https://api.tellusensors.com'
+    all_analog_devices = [f"analog{i}.ch{j}" for i in range(2) for j in range(8)]
 
     def __init__(self, api_key) -> None:
         self.api_key = api_key
@@ -29,7 +30,6 @@ class TellusClient:
         if dt_start_time.utcoffset(): # when no timezone is specified this will return a null
             timezone_offset = int(dt_start_time.utcoffset().total_seconds() / 3600)
             dt_obj_conversion["timestamp"] = dt_obj_conversion["timestamp"].apply(lambda entry: entry + pd.Timedelta(hours=timezone_offset))
-
         return dt_obj_conversion
 
     def _retrieve_data(self, start_time: str, end_time: str, devices: list, metrics: list) -> pd.DataFrame:
@@ -127,7 +127,7 @@ class TellusClient:
             metrics: list[str]=[],
             start_time: str="",
             end_time: str=datetime.datetime.now().isoformat()
-            ) -> requests.models.Response:
+            ) -> tuple[requests.models.Response, dict]:
         """Deugging tool. Get API response without post-processing
 
         :param device_ids: devices to retrieve data from
@@ -191,6 +191,8 @@ class TellusClient:
         data["timestamp"] = pd.to_datetime(data["timestamp"])
         return data
 
+
+
 if __name__ == "__main__":
     load_dotenv()
 
@@ -200,7 +202,7 @@ if __name__ == "__main__":
     FYE_2_ID = require_env("DEVICE_ID_FYE2")
     LUCY_CIL_ID = require_env("DEVICE_ID_CIL")
 
-    start_time = "2025-10-01T00:00:00-05:00" 
+    start_time = "2025-10-028T00:00:00-05:00" 
     end_time = datetime.datetime.now(datetime.timezone.utc).isoformat()
     metrics = ["bme280.pressure", "sunrise.co2","pms5003t.d2_5"]
 
