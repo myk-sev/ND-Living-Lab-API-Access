@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 import pandas as pd
 from utils import require_env
 
-
 class TellusClient:
     """Client object for interacting with the Tellus API."""
     HEADER = {'x-api-version': 'v2'}
@@ -13,24 +12,29 @@ class TellusClient:
     def __init__(self, api_key) -> None:
         self.api_key = api_key
     
-    def retrieve_data(self, start_time: str, end_time: str, devices: list, metrics: list) -> pd.DataFrame:
+
+    def retrieve_data(self, start_time: str, end_time: str, devices: list, metrics: list, long_format: bool=True) -> pd.DataFrame:
         """Clean up and format API output for analysis workflows.
         
-        parameter information detailed in _retrieve_data
+        :param flat_format: specifies whether each metric will receive it's own column
+        
+        remaining parameter information detailed in _retrieve_data
         """
         api_output = self._retrieve_data(start_time, end_time, devices, metrics) # baseoutput
 
         if api_output.empty: return api_output # in event of an error return the empty dataframe
 
-        flattened_output = self.flatten_measurements(api_output, metrics)
-        dt_obj_conversion = self.standardize_time(flattened_output) # convert time strings to dt_objs
-
+        dt_obj_conversion = self.standardize_time(api_output) # convert time strings to dt_objs
+        
         # correct output for timezone offset
         dt_start_time = datetime.datetime.fromisoformat(start_time)
         if dt_start_time.utcoffset(): # when no timezone is specified this will return a null
             timezone_offset = int(dt_start_time.utcoffset().total_seconds() / 3600)
             dt_obj_conversion["timestamp"] = dt_obj_conversion["timestamp"].apply(lambda entry: entry + pd.Timedelta(hours=timezone_offset))
-        return dt_obj_conversion
+
+        if long_format: return self.long_format(dt_obj_conversion, metrics)
+        else: return dt_obj_conversion
+
 
     def _retrieve_data(self, start_time: str, end_time: str, devices: list, metrics: list) -> pd.DataFrame:
         """Retrieve data for a specified timespan as a dataframe.
@@ -153,13 +157,13 @@ class TellusClient:
         return response, payload
 
     @staticmethod
-    def flatten_measurements(data: pd.DataFrame, metrics: list[str]) -> pd.DataFrame:
+    def long_format(data: pd.DataFrame, metrics: list[str]) -> pd.DataFrame:
         """Combine measurements into a single column. A new column is set up specifying the source sensor.
 
         :param data: output of api call
         :param metrics: the senors present in the data set
 
-        :return: normalized output
+        :return: long form api data
         """
         split_data = []
         for sensor in metrics:
@@ -190,8 +194,6 @@ class TellusClient:
         """
         data["timestamp"] = pd.to_datetime(data["timestamp"])
         return data
-
-
 
 if __name__ == "__main__":
     load_dotenv()
